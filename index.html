@@ -322,7 +322,9 @@ footer{color:var(--dim);font-size:12px;margin-top:26px;line-height:1.6}
 </head><body>
 <div id="appbar" class="appbar"><span class="as">Starting…</span></div>
 <div id="shell"><div id="shellmsg"><h2>Starting…</h2></div></div>
-<div class="wrap">
+<noscript><p style="padding:24px">This app needs JavaScript: it fetches your
+bookings from a private repository in the browser.</p></noscript>
+<div class="wrap" hidden>
   <h1>My trips</h1>
   <p class="lede">Flights, hotels and what is still open, read out of the
   ticket mailbox.</p>
@@ -1202,8 +1204,17 @@ const LS = {
   del(k)    { try { localStorage.removeItem(k); }      catch (e) {} },
 };
 
-const bar = () => document.getElementById('appbar');
-const sh  = s => document.getElementById('shellmsg').innerHTML = s;
+const bar  = () => document.getElementById('appbar');
+const page = () => document.querySelector('.wrap');
+const sh   = s => document.getElementById('shellmsg').innerHTML = s;
+
+// The page is one of two things at a time: a message, or the trips view.
+// Showing an empty trips scaffold under a "connect this device" card is how
+// it looked before this existed, and it looked broken.
+function show(what) {
+  document.getElementById('shell').hidden = what !== 'shell';
+  page().hidden = what !== 'trips';
+}
 
 function token()        { return LS.get(K.token) || ''; }
 function setToken(t)    { t ? LS.set(K.token, t) : LS.del(K.token); }
@@ -1254,7 +1265,7 @@ async function api(path, init) {
 function boot(data) {
   data.served = false;
   window.__boot(data);
-  document.getElementById('shell').hidden = true;
+  show('trips');
 }
 
 async function fetchPayload() {
@@ -1338,7 +1349,9 @@ function message(e) {
 
 function askForToken(why) {
   const create = `https://github.com/settings/personal-access-tokens/new`;
-  document.getElementById('shell').hidden = false;
+  show('shell');
+  bar().className = 'appbar';
+  bar().innerHTML = '<span class="as">Not connected</span>';
   sh(`
     <h2>Connect this device</h2>
     ${why ? `<p class="warn-line">${why}</p>` : ''}
@@ -1405,8 +1418,9 @@ async function start() {
       return;
     }
     if (cached) status('As of ' + ago(LS.get(K.at)) + ' — offline', 'warn');
-    else sh(`<h2>No connection</h2><p>Nothing is cached on this device yet,
-             so there is nothing to show until you are online.</p>`);
+    else { show('shell');
+           sh(`<h2>No connection</h2><p>Nothing is cached on this device yet,
+               so there is nothing to show until you are online.</p>`); }
   }
 }
 
