@@ -910,10 +910,6 @@ function docLinks(r){
         title="${esc(f.name || 'Document')} in Google Drive — sign in as ${esc(D.mailbox)}"
         >pdf ↗</a>`);
   });
-  // /mail/u/0/ is whichever account signed in first, and if that is not
-  // the one holding the ticket, Gmail drops the message and shows an
-  // inbox. authuser names the account; searching by the message's own
-  // RFC822 id finds it wherever it has been filed.
   // No link to the email. Gmail's web interface can only be sent to a
   // message by a URL fragment, and on a phone the link is taken over by the
   // Gmail app, which ignores the fragment and opens the inbox - so the link
