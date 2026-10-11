@@ -1,0 +1,1419 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,
+  viewport-fit=cover">
+<meta name="theme-color" content="#0b1020">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Trips">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icon.svg">
+<title>My trips</title>
+<style>
+:root{
+  --bg:#f6f7f9; --card:#fff; --ink:#15181d; --dim:#687180; --line:#e3e6ea;
+  --accent:#1f6feb; --ok:#127c4a; --okbg:#e7f6ee; --warn:#8a5a00;
+  --warnbg:#fdf3dc; --bad:#a3252b; --badbg:#fdeaea; --chip:#eef1f5;
+  --ghost:#b9c0c9; --hotel:#cfe0f5;
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme=light]){
+    --bg:#15171a; --card:#1d2024; --ink:#e8eaed; --dim:#9aa3af; --line:#2c3137;
+    --accent:#6ea8ff; --ok:#6fd49b; --okbg:#14321f; --warn:#e0b355;
+    --warnbg:#332814; --bad:#ff8f8f; --badbg:#3a1c1e; --chip:#262a2f;
+    --ghost:#4d555f; --hotel:#1e3049;
+  }
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);
+  font:14px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;}
+.wrap{max-width:1240px;margin:0 auto;padding:24px 16px 60px}
+h1{font-size:22px;margin:0 0 2px}
+.lede{color:var(--dim);margin:0 0 18px}
+.layout{display:grid;grid-template-columns:218px 1fr;gap:18px;align-items:start}
+/* Trips run across the top: the page is about one trip at a time, and a
+   column of forty-five of them was most of the screen. */
+.triplist{display:flex;gap:6px;overflow-x:auto;padding:7px;margin-bottom:10px;
+  scrollbar-width:thin}
+.triplist .triprow{flex:0 0 auto;width:auto;white-space:nowrap}
+.filters{padding:0;margin-bottom:16px;overflow:hidden}
+.filters summary{list-style:none;cursor:pointer;padding:10px 14px;
+  font-size:13px;color:var(--dim);display:flex;gap:10px;align-items:center}
+.filters summary::-webkit-details-marker{display:none}
+.filters summary:hover{color:var(--ink)}
+.filters summary .sp{flex:1}
+.filters .inner{padding:4px 14px 14px;border-top:1px solid var(--line);
+  display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));
+  gap:14px}
+.filters h4{margin:0 0 6px;font-size:11px;text-transform:uppercase;
+  letter-spacing:.04em;color:var(--dim);font-weight:600}
+.filters .chips{display:flex;flex-wrap:wrap;gap:5px}
+.fchip{display:inline-flex;align-items:center;gap:5px;font-size:12px;
+  padding:3px 9px;border:1px solid var(--line);border-radius:99px;
+  cursor:pointer;background:var(--bg)}
+.fchip:has(input:checked){background:var(--accent);border-color:var(--accent);
+  color:#fff}
+.fchip input{display:none}
+.dates{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.dates input{font:inherit;font-size:12.5px;padding:5px 7px;
+  border:1px solid var(--line);border-radius:6px;background:var(--bg);
+  color:inherit}
+.fcount{font-size:11.5px;color:var(--dim)}
+@media(max-width:900px){.layout{grid-template-columns:1fr}}
+.card{background:var(--card);border:1px solid var(--line);border-radius:10px}
+.card.scroll{overflow-x:auto}
+.card.scroll table{min-width:780px}
+.triprow{display:block;width:100%;text-align:left;background:none;border:0;
+  color:inherit;padding:9px 10px;border-radius:7px;cursor:pointer;font:inherit}
+.triprow:hover{background:var(--chip)}
+.triprow.on{background:var(--accent);color:#fff}
+.triprow small{display:block;opacity:.75;font-size:11.5px}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));
+  gap:10px;margin-bottom:16px}
+.stat{padding:12px 14px}
+.stat .k{color:var(--dim);font-size:11.5px;text-transform:uppercase;
+  letter-spacing:.04em}
+.stat .v{font-size:19px;font-weight:650;margin-top:3px}
+.stat .s{color:var(--dim);font-size:12px}
+section{margin-bottom:22px}
+h2{font-size:14px;text-transform:uppercase;letter-spacing:.05em;
+  color:var(--dim);margin:0 0 8px;display:flex;align-items:center;gap:10px}
+h2 .sp{flex:1}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th{text-align:left;color:var(--dim);font-weight:600;font-size:11.5px;
+  text-transform:uppercase;letter-spacing:.03em;padding:8px 10px;
+  border-bottom:1px solid var(--line)}
+td{padding:9px 10px;border-bottom:1px solid var(--line);vertical-align:top}
+tr:last-child td{border-bottom:0}
+tr.clickable{cursor:pointer}
+tr.clickable:hover td{background:var(--chip)}
+/* An unbooked leg is drawn the way the timeline draws it -- dashed and
+   lighter -- so the two views say the same thing without a column
+   spelling it out. */
+tr.open td{color:var(--dim)}
+tr.open td:first-child{box-shadow:inset 3px 0 0 var(--ghost)}
+tr.open td{border-bottom-style:dashed}
+tr.rerouted td:first-child{box-shadow:inset 3px 0 0 var(--bad)}
+tr.rerouted td{color:var(--dim);border-bottom-style:dashed}
+tr.hotel td:first-child{box-shadow:inset 3px 0 0 var(--hotel)}
+th[data-sort]{cursor:pointer;user-select:none;white-space:nowrap}
+th[data-sort]:hover{color:var(--ink)}
+th.sorted{color:var(--ink)}
+td.docs{white-space:nowrap}
+td.docs a{margin-right:7px}
+.editrow{font:inherit;font-size:11px;padding:1px 7px;border-radius:5px;
+  border:1px solid var(--line);background:var(--card);color:var(--dim);
+  cursor:pointer;opacity:0;transition:opacity .12s}
+tr:hover .editrow{opacity:1}
+.editrow:hover{border-color:var(--accent);color:var(--accent)}
+a.place{text-decoration:none;color:inherit;border-bottom:1px dotted var(--dim)}
+a.place:hover{color:var(--accent);border-bottom-color:var(--accent)}
+.num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+.pill{display:inline-block;padding:1px 7px;border-radius:99px;font-size:11px;
+  font-weight:600;white-space:nowrap}
+.pill.ok{background:var(--okbg);color:var(--ok)}
+.pill.open{background:var(--warnbg);color:var(--warn)}
+.pill.rerouted{background:var(--badbg);color:var(--bad)}
+.pill.hotel{background:var(--hotel);color:var(--ink)}
+.mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px}
+.term{background:var(--chip);border-radius:4px;padding:0 4px;font-size:10.5px;
+  font-weight:600}
+.dim{color:var(--dim)}
+.note{padding:9px 12px;border-radius:8px;margin-bottom:6px;font-size:13px}
+.note.danger{background:var(--badbg);color:var(--bad)}
+.note.warn{background:var(--warnbg);color:var(--warn)}
+.note.good{background:var(--okbg);color:var(--ok)}
+.note.info{background:var(--chip);color:var(--ink)}
+.note b{font-weight:650}
+.ico{width:13px;height:13px;vertical-align:-2px;margin-right:2px}
+.bag{display:inline-flex;align-items:center;font-size:11px;margin-right:8px;
+  white-space:nowrap}
+.rulebox{display:flex;align-items:center;gap:5px;flex-wrap:wrap;
+  margin-bottom:2px}
+.rule{font-size:10.5px;font-weight:600;border-radius:4px;padding:1px 6px;
+  cursor:help;white-space:nowrap}
+.rule.no{background:var(--badbg);color:var(--bad)}
+.rule.yes{background:var(--okbg);color:var(--ok)}
+.warnico{display:inline-block;background:var(--warn);color:var(--bg);
+  border-radius:50%;width:14px;height:14px;line-height:14px;text-align:center;
+  font-size:10px;font-weight:700;cursor:help}
+button.act{font:inherit;font-size:12.5px;padding:5px 11px;border-radius:7px;
+  border:1px solid var(--line);background:var(--card);color:inherit;
+  cursor:pointer}
+button.act:hover{border-color:var(--accent);color:var(--accent)}
+button.act.on{background:var(--accent);border-color:var(--accent);color:#fff}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:7px;
+  overflow:hidden}
+.seg button{font:inherit;font-size:12px;padding:4px 10px;border:0;
+  background:var(--card);color:var(--dim);cursor:pointer}
+.seg button.on{background:var(--accent);color:#fff}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:12px}
+.pnrs{display:flex;gap:6px;flex-wrap:wrap}
+.pnrs code{background:var(--chip);padding:2px 7px;border-radius:5px;
+  font-size:12px}
+footer{color:var(--dim);font-size:12px;margin-top:26px;line-height:1.6}
+
+/* ---- hero ---- */
+.hero{position:relative;border-radius:12px;overflow:hidden;margin-bottom:20px;
+  background:linear-gradient(135deg,var(--h1),var(--h2));
+  background-size:cover;background-position:center 58%}
+.hero .art{position:absolute;inset:0;opacity:.5}
+.hero .shade{position:absolute;inset:0;
+  background:linear-gradient(0deg,#000d 0%,#0009 42%,#0004 72%,#0002 100%)}
+.hero .in{position:relative;padding:22px 22px 0;color:#fff;
+  display:flex;align-items:flex-start;gap:14px;flex-wrap:wrap;min-height:120px}
+.hero h1{font-size:28px;margin:0;line-height:1.15;text-shadow:0 1px 12px #000a}
+.hero .where{font-size:13px;opacity:.92;margin-top:3px;
+  text-shadow:0 1px 8px #000b}
+.hero .sp{flex:1}
+.hero button.act{background:#ffffff26;border-color:#ffffff66;color:#fff;
+  backdrop-filter:blur(4px)}
+.hero button.act:hover{background:#ffffff3d;border-color:#fff;color:#fff}
+.hero .count{font-size:12px;background:#ffffff26;border:1px solid #ffffff55;
+  border-radius:99px;padding:3px 10px;color:#fff;backdrop-filter:blur(4px)}
+/* The numbers live in the header rather than in a second band under it. */
+.hero .stats{position:relative;display:grid;gap:1px;margin-top:20px;
+  grid-template-columns:repeat(auto-fit,minmax(135px,1fr));
+  background:#ffffff26;border-top:1px solid #ffffff26}
+.hero .stats > div{background:#00000059;backdrop-filter:blur(6px);
+  padding:11px 16px 13px;color:#fff}
+.hero .stats .k{font-size:11px;text-transform:uppercase;letter-spacing:.05em;
+  opacity:.72}
+.hero .stats .v{font-size:19px;font-weight:650;margin-top:2px;
+  text-shadow:0 1px 6px #0007}
+.hero .stats .s{font-size:11.5px;opacity:.75;line-height:1.35}
+.hero .credit{position:absolute;right:9px;top:7px;font-size:9.5px;
+  color:#ffffffb0;text-decoration:none;text-shadow:0 1px 4px #000a;z-index:2}
+.hero .credit:hover{color:#fff}
+
+/* ---- timeline, shared ---- */
+.tlcard{padding:14px}
+.nm{font-size:12.5px;padding-right:10px;white-space:nowrap;overflow:hidden;
+  text-overflow:ellipsis}
+.nm b{font-weight:600}
+.nm .n{color:var(--dim);font-size:11px}
+.legend{font-size:11.5px;color:var(--dim);margin-top:14px}
+.legend i{display:inline-block;width:10px;height:10px;border-radius:2px;
+  margin:0 4px 0 12px;vertical-align:-1px}
+
+/* ---- day grid ---- */
+.grid{display:grid;gap:3px;align-items:stretch;width:100%}
+.gh{font-size:11px;color:var(--dim);padding:0 0 5px 2px;
+  border-bottom:1px solid var(--line);white-space:nowrap;line-height:1.3}
+.gh b{color:var(--ink);font-weight:600}
+.gh.quiet{background:repeating-linear-gradient(135deg,transparent,
+  transparent 4px,color-mix(in srgb,var(--dim) 14%,transparent) 4px,
+  color-mix(in srgb,var(--dim) 14%,transparent) 8px);border-radius:4px 4px 0 0}
+.cell{background:var(--chip);border-radius:5px;min-height:36px;padding:4px;
+  display:flex;flex-direction:column;gap:3px;justify-content:center}
+.cell.empty{background:transparent}
+.cell.merged{background:color-mix(in srgb,var(--chip) 70%,transparent);
+  border:1px solid var(--line)}
+.cell.hotel{box-shadow:inset 0 0 0 2px var(--hotel)}
+.chip{font-size:10px;line-height:1.4;border-radius:3px;padding:1px 4px;
+  color:#fff;cursor:pointer;display:flex;align-items:center;gap:3px;
+  min-width:0}
+.chip .t{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;
+  min-width:0}
+.chip.flight{background:var(--accent)}
+.chip.ghost{background:transparent;border:1.2px dashed var(--ghost);
+  color:var(--dim);cursor:default}
+.chip:hover{outline:2px solid var(--ink);outline-offset:1px}
+.place{font-size:10px;color:var(--ok);font-weight:600;text-align:center;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+/* ---- broken scale ---- */
+.bwrap{position:relative}
+.axis{position:relative;height:56px;margin-left:128px}
+.axis .d{position:absolute;top:0;height:20px;border-left:1px solid var(--line);
+  font-size:11px;color:var(--ink);font-weight:600;padding-left:5px;
+  white-space:nowrap;overflow:hidden}
+.axis .ev{position:absolute;top:22px;height:34px;width:1px;
+  background:var(--line)}
+.axis .evl{position:absolute;font-size:9.5px;color:var(--dim);
+  transform:translateX(-50%);white-space:nowrap;
+  font-variant-numeric:tabular-nums}
+.axis .evl.t0{top:23px}
+.axis .evl.t1{top:38px}
+.axis .evl.dep{color:var(--accent);font-weight:600}
+.axis .q{position:absolute;top:0;height:56px;font-size:10px;color:var(--dim);
+  text-align:center;padding-top:19px;line-height:1.2;
+  background:repeating-linear-gradient(135deg,transparent,transparent 4px,
+  color-mix(in srgb,var(--dim) 14%,transparent) 4px,
+  color-mix(in srgb,var(--dim) 14%,transparent) 8px)}
+.guides{position:absolute;left:128px;right:0;top:56px;bottom:28px;
+  pointer-events:none}
+.guides i{position:absolute;top:0;bottom:0;width:1px;
+  background:color-mix(in srgb,var(--line) 70%,transparent)}
+.guides i.on{background:var(--ink);opacity:.35}
+.brow{display:flex;align-items:center;margin-top:7px}
+.brow .nm{width:128px;flex:0 0 128px}
+.track{position:relative;height:32px;flex:1}
+.blk{position:absolute;top:5px;height:22px;border-radius:4px;font-size:10px;
+  line-height:22px;color:#fff;text-align:center;overflow:hidden;cursor:pointer;
+  white-space:nowrap;min-width:4px}
+.blk.flight{background:var(--accent);
+  box-shadow:0 1px 3px color-mix(in srgb,var(--accent) 40%,transparent)}
+.blk.stay{background:color-mix(in srgb,var(--ok) 26%,transparent);
+  color:var(--ok);font-weight:600;
+  border:1px solid color-mix(in srgb,var(--ok) 45%,transparent)}
+.blk.connection{background:#9aa3af}
+.blk.ghost{background:transparent;border:1.5px dashed var(--ghost);
+  color:var(--dim);line-height:19px;cursor:default}
+.blk:hover{outline:2px solid var(--ink);outline-offset:1px;z-index:5}
+.hotelband{position:absolute;top:0;bottom:0;background:var(--hotel);
+  border-radius:4px;opacity:.55}
+.brk{position:absolute;top:0;bottom:0;background:
+  repeating-linear-gradient(135deg,transparent,transparent 4px,
+  color-mix(in srgb,var(--dim) 18%,transparent) 4px,
+  color-mix(in srgb,var(--dim) 18%,transparent) 8px);
+  border-left:1px dashed var(--dim);border-right:1px dashed var(--dim)}
+
+/* ---- tooltip and drawer ---- */
+#tip{position:fixed;z-index:60;background:var(--ink);color:var(--bg);
+  padding:7px 10px;border-radius:7px;font-size:12px;max-width:340px;
+  pointer-events:none;opacity:0;transition:opacity .08s;white-space:pre-line}
+#scrim{position:fixed;inset:0;background:#0006;opacity:0;pointer-events:none;
+  transition:opacity .15s;z-index:70}
+#scrim.on{opacity:1;pointer-events:auto}
+#drawer{position:fixed;top:0;right:0;bottom:0;width:min(440px,100%);
+  background:var(--card);border-left:1px solid var(--line);z-index:80;
+  transform:translateX(100%);transition:transform .18s;overflow:auto;
+  padding:18px 20px}
+#drawer.on{transform:none}
+#drawer h3{margin:0 0 2px;font-size:17px}
+#drawer .sub{color:var(--dim);font-size:12.5px;margin-bottom:14px}
+#drawer .kv{display:grid;grid-template-columns:106px 1fr;gap:5px 10px;
+  font-size:13px;margin-bottom:14px}
+#drawer .kv div:nth-child(odd){color:var(--dim)}
+#drawer .segbox{border:1px solid var(--line);border-radius:8px;padding:10px;
+  margin-bottom:8px;font-size:13px}
+#drawer .segbox .big{font-weight:650}
+#drawer .x{position:absolute;top:14px;right:16px;cursor:pointer;
+  color:var(--dim);font-size:20px;line-height:1}
+
+.appbar{position:sticky;top:0;z-index:40;display:flex;align-items:center;
+  gap:10px;padding:8px 14px;background:var(--bg);border-bottom:1px solid
+  var(--line);font-size:13px;color:var(--dim)}
+.appbar.warn{color:#ffb4a2}
+.appbar .as{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;
+  white-space:nowrap}
+.appbar button{font:inherit;cursor:pointer;border-radius:7px}
+.appbar .refresh{background:#1b2a47;color:#cfe3ff;border:1px solid #2c4877;
+  padding:5px 11px}
+.appbar .refresh:disabled{opacity:.6;cursor:default}
+.appbar .linky{background:none;border:none;color:var(--dim);padding:4px 6px;
+  font-size:16px}
+#shell{max-width:620px;margin:0 auto;padding:28px 18px 60px}
+#shell h2{font-size:20px;margin:0 0 12px}
+#shell p,#shell li{color:var(--dim);line-height:1.55}
+#shell ol{padding-left:20px}
+#shell li{margin-bottom:7px}
+#shell code{background:#161b2b;padding:1px 5px;border-radius:4px;font-size:12px}
+#shell .warn-line{color:#ffb4a2}
+#shell .fine{font-size:12px;margin-top:18px}
+.tokrow{display:flex;gap:8px;margin-top:16px}
+.tokrow input{flex:1;min-width:0;font:inherit;padding:9px 11px;border-radius:8px;
+  border:1px solid var(--line);background:#0f1422;color:inherit}
+.tokrow button{font:inherit;padding:9px 16px;border-radius:8px;cursor:pointer;
+  background:#1b2a47;color:#cfe3ff;border:1px solid #2c4877}
+</style>
+</head><body>
+<div id="appbar" class="appbar"><span class="as">Starting…</span></div>
+<div id="shell"><div id="shellmsg"><h2>Starting…</h2></div></div>
+<div class="wrap">
+  <h1>My trips</h1>
+  <p class="lede">Flights, hotels and what is still open, read out of the
+  ticket mailbox.</p>
+  <div class="card triplist" id="triplist"></div>
+  <div class="card filters" id="filters"></div>
+  <div id="detail"></div>
+  <div id="tip"></div>
+  <div id="scrim" onclick="closeDrawer()"></div>
+  <div id="drawer"></div>
+  <footer>
+    Amounts are what each confirmation stated, converted to rupees at
+    reference rates; unbooked legs are estimates from the fare pool, not
+    quotes. Documents open in Google Drive &mdash; sign in as the ticket
+    mailbox account. Check&nbsp;mail runs the sync in the cloud, so it works
+    with every machine of yours switched off.
+  </footer>
+</div>
+<script>
+// The local page embeds its data and boots immediately; the hosted shell
+// ships no data at all and calls __boot once it has fetched some. Same
+// renderer either way - two copies of this would drift within a week.
+let D = window.__TRIPS__ || null;
+const el = s => document.querySelector(s);
+const esc = s => String(s??'').replace(/[&<>"]/g,
+  c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const city = c => D.airports[c] || c;
+const term = t => t ? ' <span class="term">' + esc(t) + '</span>' : '';
+const at = (c,t) => esc(c) + (t ? ' ' + t : '');
+const T = s => new Date(s).getTime();
+const HOUR = 3600000, DAY = 86400000;
+
+const SYM = {INR:'₹', SGD:'S$', VND:'₫', USD:'$', EUR:'€'};
+function inr(a, c){ const r = D.fx[(c||'INR').toUpperCase()];
+  return r ? Math.round(a*r) : 0; }
+function money(a, c){
+  return (SYM[c] || (c + ' '))
+    + Math.round(a).toLocaleString(c === 'INR' ? 'en-IN' : 'en-US');
+}
+function fmtMin(m){
+  if (m == null) return '--';
+  const d = Math.floor(m/1440), h = Math.floor(m%1440/60), mm = Math.round(m%60);
+  return d ? `${d}d ${h}h` : (mm ? `${h}h ${String(mm).padStart(2,'0')}m` : `${h}h`);
+}
+function dt(iso){
+  if (!iso) return '--';
+  const [d,t] = iso.split('T');
+  return new Date(d+'T00:00').toLocaleDateString('en-GB',
+    {day:'numeric',month:'short'}) + (t ? ' ' + t : '');
+}
+const days = (a,b) => Math.round((new Date(b) - new Date(a)) / DAY);
+
+let active = 0;
+// Reading storage throws outright on an opaque origin (a data: URL, a private
+// window, blocked site data), and an exception here would take the whole
+// script with it. The remembered mode is a convenience, not state we need.
+function remember(k, v){
+  try { if (v === undefined) return localStorage.getItem(k);
+        localStorage.setItem(k, v); } catch (err) { /* not available */ }
+  return null;
+}
+let mode = remember('tl-mode') || 'days';
+
+/* Filters narrow which trips are offered, not what is inside one. They
+   are collapsed by default: most of the time you want the trip you were
+   already looking at, and an open panel of controls is in the way. */
+const F = {people: new Set(), places: new Set(), from: '', to: ''};
+
+function allPeople(){
+  const seen = new Set();
+  D.trips.forEach(t => Object.keys(t.people).forEach(p => seen.add(p)));
+  const order = (D.regulars || []);
+  return [...order.filter(p => seen.has(p)),
+          ...[...seen].filter(p => !order.includes(p)).sort()];
+}
+
+function allPlaces(){
+  const seen = new Set();
+  D.trips.forEach(t => (t.table || []).forEach(r => {
+    if (r.origin) seen.add(r.origin);
+    if (r.destination) seen.add(r.destination);
+  }));
+  return [...seen].sort();
+}
+
+function tripMatches(t){
+  if (F.people.size){
+    const on = new Set(Object.keys(t.people));
+    if (![...F.people].some(p => on.has(p))) return false;
+  }
+  if (F.places.size){
+    const here = new Set();
+    (t.table || []).forEach(r => { here.add(r.origin); here.add(r.destination); });
+    if (![...F.places].some(p => here.has(p))) return false;
+  }
+  // A trip overlaps the window if it has not finished before it starts
+  // and has not started after it ends.
+  if (F.from && (t.end || t.start) && (t.end || t.start) < F.from) return false;
+  if (F.to && t.start && t.start > F.to) return false;
+  return true;
+}
+
+function visibleTrips(){
+  const out = D.trips.filter(tripMatches);
+  return out.length ? out : D.trips;
+}
+
+function renderFilters(){
+  const people = allPeople(), places = allPlaces();
+  const chosen = F.people.size + F.places.size + (F.from ? 1 : 0)
+    + (F.to ? 1 : 0);
+  const matched = D.trips.filter(tripMatches).length;
+  el('#filters').innerHTML = `<details ${chosen ? 'open' : ''}>
+    <summary>Filter trips
+      ${chosen ? `<span class="pill open">${chosen} applied</span>` : ''}
+      <span class="sp"></span>
+      <span class="fcount">${matched} of ${D.trips.length} trips</span>
+    </summary>
+    <div class="inner">
+      <div><h4>Traveller</h4><div class="chips">
+        ${people.map(p => `<label class="fchip">
+          <input type="checkbox" data-fp="${esc(p)}"
+            ${F.people.has(p) ? 'checked' : ''}>${esc(p)}</label>`).join('')}
+      </div></div>
+      <div><h4>Place</h4><div class="chips">
+        ${places.map(p => `<label class="fchip">
+          <input type="checkbox" data-fl="${esc(p)}"
+            ${F.places.has(p) ? 'checked' : ''}>${esc(p)}
+            </label>`).join('')}
+      </div></div>
+      <div><h4>Dates</h4><div class="dates">
+        <input type="date" data-ffrom value="${esc(F.from)}">
+        <span class="fcount">to</span>
+        <input type="date" data-fto value="${esc(F.to)}">
+        <button class="act" data-fclear>Clear</button>
+      </div>
+      <div class="fcount" style="margin-top:6px">
+        A trip counts if it overlaps the window.</div>
+      </div>
+    </div></details>`;
+
+  el('#filters').querySelectorAll('[data-fp]').forEach(i => i.onchange = () => {
+    i.checked ? F.people.add(i.dataset.fp) : F.people.delete(i.dataset.fp);
+    afterFilter();
+  });
+  el('#filters').querySelectorAll('[data-fl]').forEach(i => i.onchange = () => {
+    i.checked ? F.places.add(i.dataset.fl) : F.places.delete(i.dataset.fl);
+    afterFilter();
+  });
+  const from = el('[data-ffrom]'), to = el('[data-fto]');
+  from.onchange = () => { F.from = from.value; afterFilter(); };
+  to.onchange = () => { F.to = to.value; afterFilter(); };
+  el('[data-fclear]').onclick = () => {
+    F.people.clear(); F.places.clear(); F.from = ''; F.to = '';
+    afterFilter();
+  };
+}
+
+function afterFilter(){
+  // Keep looking at the same trip if it survived the filter.
+  const was = D.trips[active];
+  const shown = visibleTrips();
+  if (!shown.includes(was)) active = D.trips.indexOf(shown[0]);
+  render();
+}
+
+function renderList(){
+  const shown = visibleTrips();
+  el('#triplist').innerHTML = D.trips.map((t,i) => shown.includes(t) ? `
+    <button class="triprow ${i===active?'on':''}" data-i="${i}">
+      ${esc(t.name)}
+      <small>${t.start ? dt(t.start) : ''}${t.pending_count ?
+        ' · ' + t.pending_count + ' open' : ''}</small>
+    </button>` : '').join('');
+  el('#triplist').querySelectorAll('.triprow').forEach(b =>
+    b.onclick = () => { active = +b.dataset.i; render(); });
+}
+
+/* A photograph if one is configured; otherwise a gradient keyed off the trip
+   name, so every trip looks like itself and the page still works offline. */
+function hero(t){
+  let n = 0;
+  for (const ch of t.name) n = (n * 31 + ch.charCodeAt(0)) % 360;
+  const away = t.start ? days(D.today, t.start) : null;
+  const sub = [t.where.slice(0,3).join(' · '),
+    away != null && away > 0 ? `in ${away} days` : null]
+    .filter(Boolean).join('  —  ');
+  const img = t.image && t.image.url;
+  const style = img
+    ? `background-image:url('${esc(t.image.url)}')`
+    : `--h1:hsl(${n},62%,42%);--h2:hsl(${(n+48)%360},58%,30%)`;
+  return `<div class="hero" style="${style}">
+    ${img ? '' : skyline(n)}
+    <div class="shade"></div>
+    ${img && t.image.credit ? `<a class="credit" target="_blank" rel="noopener"
+       href="${esc(t.image.href || '#')}">${esc(t.image.credit)}</a>` : ''}
+    <div class="in">
+      <div><h1>${esc(t.name)}</h1>
+        <div class="where">${esc(sub)}</div></div>
+      <div class="sp"></div>
+      ${t.pending_count ? `<span class="count">${t.pending_count} still to book</span>` : ''}
+      <button class="act" id="dl">Download itinerary</button>
+      <button class="act" id="print">Print</button>
+    </div>
+    <div class="stats">${statCards(t)}</div></div>`;
+}
+
+/* Cheap abstract horizon -- no network, no licensing, and it varies per trip. */
+function skyline(seed){
+  let r = seed + 1, bars = '';
+  const rnd = () => (r = (r * 1103515245 + 12345) % 2147483648) / 2147483648;
+  for (let i = 0; i < 26; i++){
+    const w = 10 + rnd() * 26, h = 16 + rnd() * 62, x = i * 24 + rnd() * 6;
+    bars += `<rect x="${x}" y="${132-h}" width="${w}" height="${h}"
+      rx="2" fill="#fff" opacity="${0.05 + rnd() * 0.13}"/>`;
+  }
+  return `<svg class="art" viewBox="0 0 640 132" preserveAspectRatio="none">
+    <circle cx="${90 + (seed % 400)}" cy="38" r="22" fill="#fff" opacity=".13"/>
+    ${bars}</svg>`;
+}
+
+function statCards(t){
+  const paid = Object.entries(t.paid).filter(([,v]) => v > 0);
+  const away = t.start ? days(D.today, t.start) : null;
+  const nights = (t.start && t.end) ? days(t.start, t.end) : null;
+  const held = Object.keys(t.people).length;
+  const cards = [
+    ['Departs', t.start ? dt(t.start) : '--',
+      away == null ? '' : away > 0 ? away + ' days away'
+        : away === 0 ? 'today' : Math.abs(away) + ' days ago'],
+    ['Travellers', t.expected || held,
+      t.expected && t.expected > held
+        ? (t.expected - held) + ' with no ticket yet'
+        : nights ? nights + ' nights' : ''],
+    ['Paid', t.paid_inr ? money(t.paid_inr,'INR') : '--',
+      paid.length > 1 ? paid.map(([c,v]) => money(v,c)).join(' + ') : ''],
+  ];
+  if (t.planned)
+    cards.push(['Still to book',
+      t.pending_count ? money(t.pending_estimate,'INR') : 'nothing',
+      !t.pending_count ? 'all booked'
+        : t.priced_count === t.pending_count
+          ? `${t.pending_count} legs at pool prices`
+          : `${t.pending_count} legs, ${t.pending_count - t.priced_count} with no price yet`]);
+  return cards.map(([k,v,s]) => `<div><div class="k">${esc(k)}</div>
+    <div class="v">${esc(v)}</div><div class="s">${esc(s||'')}</div></div>`).join('');
+}
+
+function tripNotes(t){
+  if (!t.trip_notes.length) return '';
+  const order = {danger:0, warn:1, info:2, good:3};
+  return `<section><h2>Worth knowing</h2>`
+    + [...t.trip_notes].sort((a,b)=>order[a.level]-order[b.level]).map(c =>
+      `<div class="note ${c.level}"><b>${esc(c.who)}</b> &mdash; ${esc(c.text)}</div>`
+    ).join('') + `</section>`;
+}
+
+/* ---------------- Travellers ---------------- */
+
+function cellFor(row, a, z){
+  const flights = row.blocks.filter(b => b.start
+    && (b.kind === 'flight' || b.kind === 'ghost')
+    && T(b.start) < z && T(b.end) > a)
+    .sort((p,q) => T(p.start) - T(q.start));
+  if (flights.length)
+    return {kind:'fly', flights,
+            sig:'F|' + flights.map(f => f.flight + '@' + f.start).join('+')};
+  const rest = row.blocks.find(b => b.kind === 'stay' && b.start
+    && T(b.start) < z && T(b.end) > a);
+  if (rest) return {kind:'rest', place:rest.label, detail:rest.detail,
+                    sig:'R|' + rest.label};
+  return {kind:'none', sig:'-'};
+}
+
+function dayColumns(tl, lo, hi){
+  const all = []; for (let t = lo; t < hi; t += DAY) all.push(t);
+  const flying = all.map(t => tl.rows.some(r => r.blocks.some(b =>
+    b.start && (b.kind === 'flight' || b.kind === 'ghost')
+    && T(b.start) < t + DAY && T(b.end) > t)));
+  const cols = [];
+  all.forEach((t,i) => {
+    const last = cols[cols.length-1];
+    if (!flying[i] && last && !last.flying) last.days.push(t);
+    else cols.push({days:[t], flying:flying[i]});
+  });
+  return cols;
+}
+
+function renderDays(tl){
+  const lo = T(tl.lo), hi = T(tl.hi);
+  const cols = dayColumns(tl, lo, hi);
+  const widths = cols.map(c =>
+    c.days.length > 1 ? 'minmax(0,1.4fr)' : 'minmax(0,1fr)').join(' ');
+  let h = `<div class="grid" style="grid-template-columns:minmax(0,118px) ${widths}">`;
+  h += `<div style="grid-row:1"></div>`;
+  cols.forEach((c,i) => {
+    const a = c.days[0], z = c.days[c.days.length-1];
+    const quiet = c.days.length > 1;
+    const wd = t => new Date(t).toLocaleDateString('en-GB',{weekday:'short'});
+    const lbl = quiet
+      ? `${wd(a)} &ndash; ${wd(z)}<br><b>${c.days.length} days</b>, nobody flying`
+      : `${wd(a)}<br><b>${new Date(a).toLocaleDateString('en-GB',
+          {day:'numeric',month:'short'})}</b>`;
+    h += `<div class="gh${quiet?' quiet':''}" style="grid-row:1;grid-column:${i+2}">${lbl}</div>`;
+  });
+  tl.rows.forEach((r,ri) => {
+    h += `<div class="nm" style="grid-row:${ri+2};align-self:center">`
+       + `<b>${esc(r.label)}</b>`
+       + (r.count > 1 ? ` <span class="n">×${r.count}</span>` : '')
+       + `</div>`;
+  });
+  cols.forEach((c,ci) => {
+    const a = c.days[0], z = c.days[c.days.length-1] + DAY;
+    const cells = tl.rows.map(r => cellFor(r, a, z));
+    let ri = 0;
+    while (ri < cells.length){
+      let span = 1;
+      while (ri + span < cells.length && cells[ri+span].sig === cells[ri].sig
+             && cells[ri].sig !== '-') span++;
+      const cell = cells[ri];
+      const inHotel = tl.hotel && T(tl.hotel.start) < z && T(tl.hotel.end) > a
+        && tl.rows.slice(ri, ri+span).every(r => r.inHotel);
+      let inner = '';
+      if (cell.kind === 'fly'){
+        inner = cell.flights.map(f => {
+          const lbl = (T(f.start) < a ? '→' : f.start.slice(11,16))
+                    + ' ' + f.label;
+          return `<div class="chip ${f.kind}" data-tip="${esc(f.detail)}"`
+               + (f.booking ? ` data-open="${esc(f.vendor)}|${esc(f.booking)}"` : '')
+               + `><span class="t">${esc(lbl)}</span>`
+               + (f.warn ? `<span class="warnico" data-tip="${esc(f.warn)}">!</span>` : '')
+               + `</div>`;
+        }).join('');
+      } else if (cell.kind === 'rest'){
+        inner = `<div class="place" data-tip="${esc(cell.detail)}">${esc(cell.place)}</div>`;
+      }
+      h += `<div class="cell${cell.kind==='none'?' empty':''}`
+         + `${span>1?' merged':''}${inHotel?' hotel':''}" `
+         + `style="grid-column:${ci+2};grid-row:${ri+2} / span ${span}">${inner}</div>`;
+      ri += span;
+    }
+  });
+  return h + `</div>` + legend(true);
+}
+
+function legend(grid){
+  return `<div class="legend">`
+    + `<i style="background:var(--accent)"></i>flight`
+    + (grid ? '' : `<i style="background:#9aa3af"></i>connection`)
+    + `<i style="background:var(--ok)"></i>${grid?'staying put':'on the ground'}`
+    + `<i style="border:1.2px dashed var(--ghost)"></i>not booked`
+    + `<i style="background:var(--hotel)"></i>hotel`
+    + `<span class="warnico" style="margin-left:14px">!</span> terminal change`
+    + `</div>`;
+}
+
+function renderBroken(tl, width){
+  const lo = T(tl.lo), hi = T(tl.hi);
+  const busy = [];
+  tl.rows.forEach(r => r.blocks.forEach(b => {
+    if (!b.start || b.kind === 'stay') return;
+    busy.push([T(b.start) - HOUR, T(b.end) + HOUR]);
+  }));
+  busy.sort((a,b) => a[0]-b[0]);
+  const merged = [];
+  busy.forEach(iv => {
+    const last = merged[merged.length-1];
+    if (last && iv[0] <= last[1]) last[1] = Math.max(last[1], iv[1]);
+    else merged.push([...iv]);
+  });
+  const from = merged.length ? merged[0][0] : lo;
+  const to = merged.length ? merged[merged.length-1][1] : hi;
+  const dead = [];
+  let cur = from;
+  merged.forEach(([a,z]) => {
+    if (a - cur > 8*HOUR) dead.push([cur, a]);
+    cur = Math.max(cur, z);
+  });
+
+  const stub = 46;
+  const live = (to - from) - dead.reduce((s,[a,z]) => s + (z-a), 0);
+  const perMs = (width - dead.length*stub) / live;
+  const x = t => {
+    t = Math.max(from, Math.min(t, to));
+    let px = 0, c = from;
+    for (const [a,z] of dead){
+      if (t <= a) break;
+      px += (a - c) * perMs; c = a;
+      if (t <= z) return px + stub * ((t-a)/(z-a));
+      px += stub; c = z;
+    }
+    return px + (t - c) * perMs;
+  };
+
+  let axis = '';
+  for (let t = lo; t < hi; t += DAY){
+    const a = x(Math.max(t,from)), b = x(Math.min(t+DAY,to));
+    if (b - a < 14) continue;
+    axis += `<div class="d" style="left:${a}px;width:${b-a}px">`
+          + (b-a > 46 ? dt(new Date(t).toISOString().slice(0,10))
+                      : new Date(t).getDate()) + '</div>';
+  }
+  const inDead = t => dead.some(([a,z]) => t > a && t < z);
+  const events = new Map();
+  tl.rows.forEach(r => r.blocks.forEach(b => {
+    if (!b.start || b.kind === 'stay' || b.kind === 'connection') return;
+    [['dep',b.start],['arr',b.end]].forEach(([role,iso]) => {
+      const t = T(iso);
+      if (inDead(t)) return;
+      const k = Math.round(t/60000), prev = events.get(k);
+      events.set(k, {t, hhmm:iso.slice(11,16),
+                     dep:(prev && prev.dep) || role === 'dep'});
+    });
+  }));
+  const placed = [[],[]];
+  let guides = '';
+  [...events.values()].sort((a,b)=>a.t-b.t).forEach(ev => {
+    const px = x(ev.t);
+    if (px < 0 || px > width) return;
+    guides += `<i data-t="${ev.t}" style="left:${px}px"></i>`;
+    axis += `<div class="ev" style="left:${px}px"></div>`;
+    const tier = placed.findIndex(row => row.every(p => Math.abs(p-px) > 30));
+    if (tier < 0) return;
+    placed[tier].push(px);
+    axis += `<div class="evl t${tier}${ev.dep?' dep':''}" style="left:${px}px">`
+          + ev.hhmm + `</div>`;
+  });
+  dead.forEach(([a,z]) => {
+    const hrs = Math.round((z-a)/HOUR), d = Math.floor(hrs/24), hh = hrs%24;
+    axis += `<div class="q" style="left:${x(a)}px;width:${stub}px"
+      data-tip="${hrs} hours with nobody flying, skipped">`
+      + (d?d+'d':'') + (hh?' '+hh+'h':'') + `</div>`;
+  });
+
+  let h = `<div class="bwrap"><div class="axis">${axis}</div>`
+        + `<div class="guides">${guides}</div>`;
+  tl.rows.forEach(r => {
+    let blocks = '';
+    if (tl.hotel && r.inHotel){
+      const a = x(T(tl.hotel.start)), b = x(T(tl.hotel.end));
+      blocks += `<div class="hotelband" style="left:${a}px;width:${Math.max(b-a,2)}px"
+        data-tip="${esc(tl.hotel.label)}"></div>`;
+    }
+    dead.forEach(([a]) =>
+      blocks += `<div class="brk" style="left:${x(a)}px;width:${stub}px"></div>`);
+    r.blocks.forEach(b => {
+      if (!b.start) return;
+      const a = x(T(b.start)), z = x(T(b.end));
+      const w = Math.max(z-a, b.kind === 'stay' ? 2 : 7);
+      let lbl = '';
+      if (b.kind === 'stay' || b.kind === 'connection'){
+        const dur = fmtMin((T(b.end)-T(b.start))/60000);
+        lbl = w > 120 ? `${b.label} · ${dur}` : w > 46 ? dur : '';
+      } else {
+        lbl = w > 150 ? `${b.start.slice(11,16)} ${b.label} ${b.end.slice(11,16)}`
+            : w > 52 ? b.label : '';
+      }
+      blocks += `<div class="blk ${b.kind}" style="left:${a}px;width:${w}px"`
+        + ` data-from="${T(b.start)}" data-to="${T(b.end)}"`
+        + (b.booking ? ` data-open="${esc(b.vendor)}|${esc(b.booking)}"` : '')
+        + ` data-tip="${esc(b.detail)}">${esc(lbl)}</div>`;
+    });
+    h += `<div class="brow"><div class="nm"><b>${esc(r.label)}</b>`
+       + (r.count > 1 ? ` <span class="n">×${r.count}</span>` : '')
+       + `</div><div class="track">${blocks}</div></div>`;
+  });
+  return h + `</div>` + legend(false);
+}
+
+function travellers(t){
+  if (!t.timeline.rows.length) return '';
+  return `<section><h2>Travellers<span class="sp"></span>
+    <span class="seg">
+      <button data-m="days" class="${mode==='days'?'on':''}">Days</button>
+      <button data-m="hours" class="${mode==='hours'?'on':''}">Hours</button>
+    </span></h2>
+    <div class="card tlcard" id="tl"></div></section>`;
+}
+
+function paintTimeline(t){
+  const host = el('#tl');
+  if (!host) return;
+  host.innerHTML = mode === 'days'
+    ? renderDays(t.timeline)
+    : renderBroken(t.timeline, host.clientWidth - 128);
+}
+
+/* ---------------- the one table ---------------- */
+
+/* Sorting is by column, and by When unless told otherwise, because a
+   trip is a sequence before it is anything else. */
+const SORT = {by: 'when', dir: 1};
+let hideOpen = remember('hide-open') === '1';
+
+const COLUMNS = [
+  {key: 'when',   label: 'When',       get: r => r.depart || '9999'},
+  {key: 'route',  label: 'Route',      get: r => `${r.origin}-${r.destination}`},
+  {key: 'who',    label: 'Who',        get: r => (r.who || []).join(', ')},
+  {key: 'flight', label: 'Flight',     get: r => `${r.airline} ${r.flight_no}`},
+  {key: 'rules',  label: 'Fare rules', get: r => (r.refundable === false ? 0 : 1)},
+  {key: 'ref',    label: 'Ref',        get: r => r.pnr || r.booking_id || ''},
+  {key: 'cost',   label: 'Cost',       get: r => r.paid_inr || 0, num: true},
+  {key: 'docs',   label: 'Docs',       get: r => (r.source_message ? 1 : 0)},
+];
+
+/* An airport terminal on a map, because "T2" means nothing until you are
+   trying to find it. A hotel links to the property itself. */
+function placeLink(code, term, kind, row){
+  if (kind === 'hotel')
+    return row.map
+      ? `<a href="${esc(row.map)}" target="_blank" rel="noopener"
+           onclick="event.stopPropagation()">${esc(row.airline)} ↗</a>`
+      : esc(row.airline);
+  if (!code) return '';
+  const q = encodeURIComponent(
+    `${city(code)} airport${term ? ' Terminal ' + term.replace(/^T/, '') : ''}`);
+  return `<a class="place" target="_blank" rel="noopener"
+    onclick="event.stopPropagation()"
+    href="https://www.google.com/maps/search/?api=1&query=${q}"
+    title="${esc(city(code))}${term ? ', terminal ' + term.replace(/^T/,'') : ''}"
+    >${esc(code)}${term ? `<span class="term">${esc(term)}</span>` : ''}</a>`;
+}
+
+/* The document itself if we have it on disk and are being served, and the
+   Drive copy otherwise -- which needs the right Google account, so the
+   link says so rather than leaving you staring at a permission error. */
+function docLinks(r){
+  const out = [];
+  (r.files || []).forEach(f => {
+    if (f.local && D.served)
+      out.push(`<a href="${esc(f.local)}" target="_blank" rel="noopener"
+        onclick="event.stopPropagation()"
+        title="${esc(f.name || '')} — the copy on this machine">pdf</a>`);
+    else if (f.link)
+      out.push(`<a href="${esc(f.link)}" target="_blank" rel="noopener"
+        onclick="event.stopPropagation()"
+        title="${esc(f.name || 'Document')} in Google Drive — sign in as ${esc(D.mailbox)}"
+        >pdf ↗</a>`);
+  });
+  // /mail/u/0/ is whichever account signed in first, and if that is not
+  // the one holding the ticket, Gmail drops the message and shows an
+  // inbox. authuser names the account; searching by the message's own
+  // RFC822 id finds it wherever it has been filed.
+  if (r.source_rfc)
+    out.push(`<a href="https://mail.google.com/mail/u/?authuser=${esc(D.mailbox)}` +
+      `#search/rfc822msgid:${encodeURIComponent(r.source_rfc)}"
+      target="_blank" rel="noopener" onclick="event.stopPropagation()"
+      title="The confirmation email in ${esc(D.mailbox)}">mail ↗</a>`);
+  else if (r.source_message)
+    out.push(`<a href="https://mail.google.com/mail/u/?authuser=${esc(D.mailbox)}` +
+      `#all/${esc(r.source_message)}"
+      target="_blank" rel="noopener" onclick="event.stopPropagation()"
+      title="The confirmation email in ${esc(D.mailbox)}">mail ↗</a>`);
+  return out.length ? out.join(' ') : '<span class="dim">--</span>';
+}
+
+/* A suitcase and a cabin bag, drawn rather than spelled out: the allowance
+   is two short numbers and a column of "Check-in Baggage: 23 Kg" is noise. */
+const BAG = `<svg viewBox="0 0 16 16" class="ico"><rect x="3" y="5" width="10"
+  height="9" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.4"/>
+  <path d="M6 5V3.5A1 1 0 0 1 7 2.5h2a1 1 0 0 1 1 1V5" fill="none"
+  stroke="currentColor" stroke-width="1.4"/></svg>`;
+const CABIN = `<svg viewBox="0 0 16 16" class="ico"><rect x="4.5" y="6"
+  width="7" height="8" rx="1.2" fill="none" stroke="currentColor"
+  stroke-width="1.4"/><path d="M6.5 6V4a1.5 1.5 0 0 1 3 0v2" fill="none"
+  stroke="currentColor" stroke-width="1.4"/></svg>`;
+
+function rules(r){
+  if (r.status !== 'booked')
+    return r.misses && r.misses.length
+      ? `<span class="dim" title="${esc(r.misses.join(', '))}">compromises</span>`
+      : '<span class="dim">--</span>';
+  const bits = [];
+  if (r.checked_kg) bits.push(`<span class="bag" title="Checked baggage">
+    ${BAG}${esc(r.checked_kg)}</span>`);
+  if (r.cabin_kg) bits.push(`<span class="bag" title="Cabin baggage">
+    ${CABIN}${esc(r.cabin_kg)}</span>`);
+  let flag = '';
+  if (r.refundable === false)
+    flag = `<span class="rule no" title="${esc(r.cancel_fee || 'Non-refundable')}">locked</span>`;
+  else if (r.cancel_fee)
+    flag = `<span class="rule yes" title="${esc(r.cancel_fee)
+      + (r.change_fee ? ' / ' + r.change_fee : '')}">flexible</span>`;
+  else if (r.change_fee)
+    flag = `<span class="rule yes" title="${esc(r.change_fee)}">changeable</span>`;
+  const notes = (r.notes || []).map(n =>
+    `<span class="warnico" data-tip="${esc(n.text)}">!</span>`).join(' ');
+  return `<div class="rulebox">${flag}${notes}</div>`
+       + (bits.length ? `<div class="rulebox dim">${bits.join('')}</div>` : '');
+}
+
+function theTable(t){
+  let rows = t.table.slice();
+  if (hideOpen) rows = rows.filter(r => r.status === 'booked');
+  const col = COLUMNS.find(c => c.key === SORT.by) || COLUMNS[0];
+  rows.sort((a, b) => {
+    const x = col.get(a), y = col.get(b);
+    const c = col.num ? x - y : String(x).localeCompare(String(y));
+    return (c || String(a.depart).localeCompare(String(b.depart))) * SORT.dir;
+  });
+
+  const openCount = t.table.filter(r => r.status !== 'booked').length;
+  const body = rows.map(r => {
+    const state = r.kind === 'hotel' ? 'hotel' : r.status;
+    const route = r.kind === 'hotel'
+      ? placeLink('', '', 'hotel', r)
+      : `${placeLink(r.origin, r.dep_terminal)} → `
+        + `${placeLink(r.destination, r.arr_terminal)}`
+        + (r.rerouted ? `<div class="dim">planned to ${esc(r.rerouted)}</div>` : '');
+    const when = r.kind === 'hotel'
+      ? `${dt(r.depart)}<div class="dim">to ${dt(r.arrive)}</div>`
+      : r.depart
+        ? `${dt(r.depart)}`
+          + (r.arrive ? `<div class="dim">→ ${dt(r.arrive)}</div>` : '')
+          + (r.duration_min ? `<div class="dim">${fmtMin(r.duration_min)}</div>` : '')
+        : '<span class="dim">--</span>';
+    const cost = r.paid_inr
+      ? money(r.paid_inr, 'INR')
+        + (r.estimate ? '<div class="dim">estimate</div>'
+           : r.currency !== 'INR' ? `<div class="dim">${money(r.paid, r.currency)}</div>` : '')
+      : '<span class="dim">--</span>';
+    return `<tr class="clickable ${state}" data-open="${esc(r.vendor)}|${esc(r.booking_id)}">
+      <td>${when}</td>
+      <td${r.kind === 'hotel' ? ' colspan="2"' : ''}>${route}
+        ${r.kind === 'hotel' && r.address
+          ? `<div class="dim">${esc(r.address)}</div>` : ''}</td>
+      ${r.kind === 'hotel' ? '' : `<td>${esc((r.who || []).map(firstName).join(', '))}</td>`}
+      <td>${r.checkin && r.pnr
+          ? `<a href="#" class="ci" data-url="${esc(r.checkin)}"
+               data-pnr="${esc(r.pnr)}"
+               title="Copy ${esc(r.pnr)} and open web check-in"
+               >${esc(r.airline)}</a>`
+          : esc(r.airline)}
+        ${r.flight_no ? `<div class="mono dim">${esc(r.flight_no)}</div>` : ''}
+        ${r.stops ? `<div class="dim">${r.stops} stop</div>` : ''}</td>
+      <td>${rules(r)}</td>
+      <td>${r.pnr ? `<code class="mono">${esc(r.pnr)}</code>` : '<span class="dim">--</span>'}
+        <div class="dim">${esc(r.vendor)}</div></td>
+      <td class="num">${cost}</td>
+      <td class="docs">${docLinks(r)}
+        <button class="editrow" data-edit="${esc(r.vendor)}|${esc(r.booking_id)}"
+          title="Open this booking on the review desk to change it">edit</button></td>
+    </tr>`;
+  }).join('');
+
+  const heads = COLUMNS.map(c => `<th data-sort="${c.key}"
+    class="${c.num ? 'num' : ''} ${SORT.by === c.key ? 'sorted' : ''}">
+    ${esc(c.label)}${SORT.by === c.key ? (SORT.dir > 0 ? ' ↑' : ' ↓') : ''}
+    </th>`).join('');
+
+  return `<section><h2>Bookings${openCount ? ' and open legs' : ''}
+      <span class="sp"></span>
+      ${openCount ? `<label class="chk"><input type="checkbox" id="hideopen"
+        ${hideOpen ? 'checked' : ''}> hide the ${openCount} not booked</label>` : ''}
+    </h2>
+    <div class="card scroll"><table><tr>${heads}</tr>${body}</table></div>
+    <div class="legend" style="margin-top:6px">Open legs are priced from the
+    pool collected ${D.pool_generated ? dt(D.pool_generated) : 'previously'};
+    estimates, not quotes. Click a row for the full booking, or
+    <b>edit</b> to change it.</div></section>`;
+}
+
+function firstName(name){
+  return String(name || '').split(' ')[0];
+}
+
+/* ---------------- drawer ---------------- */
+
+function openDrawer(key){
+  const t = D.trips[active];
+  const [vendor, id] = key.split('|');
+  const row = t.table.find(r => r.vendor === vendor && r.booking_id === id);
+  if (!row) return;
+  // A row can stand for several bookings -- one ticket per passenger on the
+  // same flight -- so collect the segments from all of them, deduped.
+  const srcs = (row.sources || []).map(([v,i]) =>
+    t.bookings.find(b => b.vendor === v && b.booking_id === i)).filter(Boolean);
+  const src = srcs[0];
+  const seen = new Set();
+  const segs = srcs.flatMap(b => b.segments).filter(s => {
+    const k = s.flight_no + s.depart;
+    if (seen.has(k)) return false;
+    seen.add(k); return true;
+  }).map(s => `
+    <div class="segbox">
+      <div class="big">${esc(s.airline)} ${esc(s.flight_no)}</div>
+      <div>${at(s.origin, s.dep_terminal)} ${esc(dt(s.depart))}
+        &rarr; ${at(s.destination, s.arr_terminal)} ${esc(dt(s.arrive))}</div>
+      <div class="dim">${esc(s.cabin || '')}${s.checked_kg ? ' · ' + esc(s.checked_kg) + ' checked' : ''}</div>
+    </div>`).join('');
+  el('#drawer').innerHTML = `<div class="x" onclick="closeDrawer()">&times;</div>
+    <h3>${esc(row.kind === 'hotel' ? row.airline : row.origin + ' → ' + row.destination)}</h3>
+    <div class="sub">${esc(row.who.join(', '))}</div>
+    ${row.notes.map(n => `<div class="note ${n.level}">${esc(n.text)}</div>`).join('')}
+    <div class="kv">
+      <div>Reference</div><div class="mono">${esc(row.pnr || row.booking_id)}</div>
+      <div>Booked via</div><div>${esc(row.vendor || '--')}</div>
+      <div>Paid</div><div>${row.paid ? money(row.paid, row.currency)
+        + (row.currency !== 'INR' ? ` (${money(row.paid_inr,'INR')})` : '') : '--'}</div>
+      ${src && src.fare_type ? `<div>Fare</div><div>${esc(src.fare_type)}</div>` : ''}
+      ${row.cancel_fee ? `<div>Cancellation</div><div>${esc(row.cancel_fee)}</div>` : ''}
+      ${src && src.change_fee ? `<div>Changes</div><div>${esc(src.change_fee)}</div>` : ''}
+      ${src && src.booked_on ? `<div>Booked on</div><div>${esc(src.booked_on)}</div>` : ''}
+    </div>
+    ${segs}
+    ${row.address ? `<div class="kv"><div>Address</div>
+      <div>${esc(row.address)}</div></div>` : ''}
+    ${row.source_message ? `<a target="_blank" rel="noopener"
+      href="https://mail.google.com/mail/u/0/#all/${esc(row.source_message)}">
+      Open the confirmation email ↗</a><br>` : ''}
+    ${row.map ? `<a target="_blank" rel="noopener" href="${esc(row.map)}">
+      Find it on Google Maps ↗</a>` : ''}`;
+  el('#drawer').classList.add('on');
+  el('#scrim').classList.add('on');
+}
+function closeDrawer(){
+  el('#drawer').classList.remove('on');
+  el('#scrim').classList.remove('on');
+}
+
+/* ---------------- itinerary ---------------- */
+
+function itinerary(t){
+  const L = [t.name.toUpperCase(), ''];
+  Object.entries(t.people).forEach(([n,p]) => {
+    L.push(n);
+    p.hops.forEach(h => L.push(
+      `  ${dt(h.depart)}  ${at(h.from,h.dep_terminal)} - ${at(h.to,h.arr_terminal)}`
+      + `  ${h.airline} ${h.flight}  arr ${dt(h.arrive)}  PNR ${h.pnr}`));
+    L.push(`  flying ${fmtMin(p.analysis.flying_min)} of ${fmtMin(p.analysis.total_min)} total`, '');
+  });
+  t.hotels.forEach(h => L.push(`HOTEL  ${h.segments[0]?.airline || ''}  `
+    + `${dt(h.segments[0]?.depart)} - ${dt(h.segments[0]?.arrive)}  `
+    + `ref ${h.booking_id}  ${h.fare_type}`));
+  if (t.hotels.length) L.push('');
+  L.push(`PAID  ${money(t.paid_inr,'INR')}`);
+  if (t.pending_count)
+    L.push(`STILL TO BOOK  ${t.pending_count} legs, about `
+      + `${money(t.pending_estimate,'INR')} at pool prices`);
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([L.join('\n')], {type:'text/plain'}));
+  a.download = t.name.replace(/[^\w]+/g,'-').toLowerCase() + '-itinerary.txt';
+  a.click(); URL.revokeObjectURL(a.href);
+}
+
+/* ---------------- shell ---------------- */
+
+function render(){
+  renderFilters();
+  renderList();
+  const t = D.trips[active];
+  if (!t){ el('#detail').innerHTML = '<p class="dim">No trips found.</p>'; return; }
+  el('#detail').innerHTML = `
+    ${hero(t)}
+    ${travellers(t)}
+    ${tripNotes(t)}
+    ${theTable(t)}`;
+  paintTimeline(t);
+  // Sorting, hiding and editing are wired after each render, because the
+  // table is redrawn whole.
+  document.querySelectorAll('th[data-sort]').forEach(th => th.onclick = () => {
+    const key = th.dataset.sort;
+    SORT.dir = SORT.by === key ? -SORT.dir : 1;
+    SORT.by = key;
+    render();
+  });
+  const hide = el('#hideopen');
+  if (hide) hide.onchange = () => {
+    hideOpen = hide.checked;
+    remember('hide-open', hideOpen ? '1' : '0');
+    render();
+  };
+  document.querySelectorAll('[data-edit]').forEach(b => b.onclick = async (e) => {
+    e.stopPropagation();
+    b.disabled = true;
+    const r = await fetch('/api/review-edit', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json', 'X-Planner': '1'},
+      body: JSON.stringify({key: b.dataset.edit}),
+    }).then(x => x.json()).catch(() => ({ok: false}));
+    b.disabled = false;
+    if (r.ok) location.href = '/review.html';
+    else alert(r.error || 'Could not open this on the review desk. '
+      + 'The page has to be served by `python flights.py serve`.');
+  });
+
+  el('#dl').onclick = () => itinerary(t);
+  el('#print').onclick = () => window.print();
+  document.querySelectorAll('.seg button').forEach(b => b.onclick = () => {
+    mode = b.dataset.m; remember('tl-mode', mode); render();
+  });
+}
+
+const tip = document.getElementById('tip');
+document.addEventListener('mouseover', e => {
+  const g = document.querySelectorAll('.guides i');
+  g.forEach(i => i.classList.remove('on'));
+  const blk = e.target.closest('.blk[data-from]');
+  if (blk) g.forEach(i => {
+    const v = +i.dataset.t;
+    if (v === +blk.dataset.from || v === +blk.dataset.to) i.classList.add('on');
+  });
+  const el2 = e.target.closest('[data-tip]');
+  if (!el2){ tip.style.opacity = 0; return; }
+  tip.textContent = el2.dataset.tip;
+  tip.style.opacity = 1;
+});
+document.addEventListener('mousemove', e => {
+  tip.style.left = Math.min(e.clientX + 14, innerWidth - 350) + 'px';
+  tip.style.top = (e.clientY + 18) + 'px';
+});
+/* Copy the PNR, then open the airline's check-in page. No airline takes the
+   reference reliably as a query parameter, so the clipboard is the handover.
+   navigator.clipboard is unavailable on file:// in some browsers, hence the
+   execCommand fallback. */
+function copyText(s){
+  try {
+    if (navigator.clipboard && isSecureContext)
+      return navigator.clipboard.writeText(s).then(() => true, () => legacy(s));
+  } catch (err) { /* fall through */ }
+  return Promise.resolve(legacy(s));
+}
+function legacy(s){
+  const ta = document.createElement('textarea');
+  ta.value = s; ta.style.position = 'fixed'; ta.style.opacity = '0';
+  document.body.appendChild(ta); ta.select();
+  let ok = false;
+  try { ok = document.execCommand('copy'); } catch (err) { ok = false; }
+  ta.remove();
+  return ok;
+}
+function flash(msg){
+  tip.textContent = msg;
+  tip.style.opacity = 1;
+  clearTimeout(flash.t);
+  flash.t = setTimeout(() => { tip.style.opacity = 0; }, 1800);
+}
+
+document.addEventListener('click', e => {
+  const ci = e.target.closest('.ci');
+  if (ci){
+    e.preventDefault(); e.stopPropagation();
+    const pnr = ci.dataset.pnr;
+    Promise.resolve(copyText(pnr)).then(ok => {
+      flash(ok ? `${pnr} copied — opening check-in`
+               : `Could not copy; the reference is ${pnr}`);
+      window.open(ci.dataset.url, '_blank', 'noopener');
+    });
+    return;
+  }
+  const o = e.target.closest('[data-open]');
+  if (o && o.dataset.open && !o.dataset.open.startsWith('|')) openDrawer(o.dataset.open);
+});
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeDrawer(); });
+addEventListener('resize', () => { if (D) paintTimeline(D.trips[active]); });
+
+window.__boot = data => { D = data; active = 0; render(); };
+if (D) render();
+</script>
+<script>
+// ---------------------------------------------------------------------------
+// The shell's own code: get a payload, hand it to the renderer, keep a copy.
+//
+// Everything here is written to survive a phone with no signal and a browser
+// that refuses storage, because both are normal. A cached payload boots the
+// page before the network is consulted at all.
+// ---------------------------------------------------------------------------
+
+const CFG = {"owner":"adeshag17","repo":"vietnam-flights","ref":"master","workflow":"sync-mail.yml","payload":"data/trips-payload.json"};
+
+const K = {token: 'ft.token', data: 'ft.payload', at: 'ft.payload.at'};
+
+// localStorage throws outright in some privacy modes, and an uncaught throw
+// here would take the whole page down with it.
+const LS = {
+  get(k)    { try { return localStorage.getItem(k); }  catch (e) { return null; } },
+  set(k, v) { try { localStorage.setItem(k, v); }      catch (e) {} },
+  del(k)    { try { localStorage.removeItem(k); }      catch (e) {} },
+};
+
+const bar = () => document.getElementById('appbar');
+const sh  = s => document.getElementById('shellmsg').innerHTML = s;
+
+function token()        { return LS.get(K.token) || ''; }
+function setToken(t)    { t ? LS.set(K.token, t) : LS.del(K.token); }
+
+function ago(iso) {
+  if (!iso) return '';
+  const m = Math.round((Date.now() - new Date(iso).getTime()) / 60000);
+  if (m < 1)  return 'just now';
+  if (m < 60) return m + ' min ago';
+  const h = Math.round(m / 60);
+  if (h < 24) return h + (h === 1 ? ' hour ago' : ' hours ago');
+  const d = Math.round(h / 24);
+  return d + (d === 1 ? ' day ago' : ' days ago');
+}
+
+function status(text, kind) {
+  const b = bar();
+  if (!b) return;
+  b.className = 'appbar ' + (kind || '');
+  b.innerHTML =
+    `<span class="as">${text}</span>` +
+    `<button id="refresh" class="refresh">Check mail</button>` +
+    `<button id="signout" class="linky" title="Forget the token">⋯</button>`;
+  document.getElementById('refresh').onclick = refresh;
+  document.getElementById('signout').onclick = () => {
+    if (confirm('Forget the token on this device?')) { setToken(''); start(); }
+  };
+}
+
+async function api(path, init) {
+  const r = await fetch('https://api.github.com' + path, Object.assign({
+    headers: {
+      'Authorization': 'Bearer ' + token(),
+      'Accept': 'application/vnd.github+json',
+      'X-GitHub-Api-Version': '2022-11-28',
+    },
+  }, init || {}));
+  if (r.status === 401) throw new Error('token-bad');
+  if (r.status === 404) throw new Error('token-scope');
+  if (r.status === 403) throw new Error('token-forbidden');
+  if (!r.ok) throw new Error('http-' + r.status);
+  return r;
+}
+
+// The renderer expects window.__TRIPS__-shaped data. One field has to change:
+// `served` means "a local server is answering, so links to files on disk
+// work". Nothing is on this phone's disk.
+function boot(data) {
+  data.served = false;
+  window.__boot(data);
+  document.getElementById('shell').hidden = true;
+}
+
+async function fetchPayload() {
+  const r = await api(`/repos/${CFG.owner}/${CFG.repo}/contents/${CFG.payload}`
+                      + `?ref=${CFG.ref}`,
+                      {headers: {
+                        'Authorization': 'Bearer ' + token(),
+                        'Accept': 'application/vnd.github.raw',
+                        'X-GitHub-Api-Version': '2022-11-28',
+                      }});
+  const text = await r.text();
+  JSON.parse(text);                       // fail here, not after we cache it
+  LS.set(K.data, text);
+  LS.set(K.at, new Date().toISOString());
+  return JSON.parse(text);
+}
+
+async function refresh() {
+  const btn = document.getElementById('refresh');
+  if (btn) { btn.disabled = true; btn.textContent = 'Checking…'; }
+  const since = Date.now() - 60000;
+  try {
+    await api(`/repos/${CFG.owner}/${CFG.repo}/actions/workflows/`
+              + `${CFG.workflow}/dispatches`,
+              {method: 'POST',
+               body: JSON.stringify({ref: CFG.ref})});
+  } catch (e) {
+    status(message(e) + ' — <a href="#" id="retry">try again</a>', 'warn');
+    const r = document.getElementById('retry');
+    if (r) r.onclick = ev => { ev.preventDefault(); refresh(); };
+    return;
+  }
+
+  // Wait for the run the button just started. Up to four minutes; a sync that
+  // finds nothing takes about twenty seconds.
+  for (let i = 0; i < 48; i++) {
+    await new Promise(r => setTimeout(r, 5000));
+    let run;
+    try {
+      const r = await api(`/repos/${CFG.owner}/${CFG.repo}/actions/workflows/`
+                          + `${CFG.workflow}/runs?event=workflow_dispatch`
+                          + `&per_page=5`);
+      const runs = (await r.json()).workflow_runs || [];
+      run = runs.find(x => new Date(x.created_at).getTime() >= since);
+    } catch (e) { continue; }
+    if (!run) continue;
+    if (run.status !== 'completed') {
+      if (btn) btn.textContent = 'Reading mail…';
+      continue;
+    }
+    if (run.conclusion !== 'success') {
+      status(`The sync failed — <a href="${run.html_url}" target="_blank"
+              rel="noopener">see the run</a>`, 'warn');
+      return;
+    }
+    try {
+      boot(await fetchPayload());
+      status('Checked just now');
+    } catch (e) {
+      status(message(e), 'warn');
+    }
+    return;
+  }
+  status('The sync is taking longer than usual; pull again in a minute', 'warn');
+}
+
+function message(e) {
+  switch (e && e.message) {
+    case 'token-bad':
+      return 'That token is not valid any more';
+    case 'token-scope':
+      return 'The token cannot see this repository';
+    case 'token-forbidden':
+      return 'The token lacks permission for that (Actions: write)';
+    default:
+      return 'No connection';
+  }
+}
+
+// ---------------------------------------------------------------------------
+
+function askForToken(why) {
+  const create = `https://github.com/settings/personal-access-tokens/new`;
+  document.getElementById('shell').hidden = false;
+  sh(`
+    <h2>Connect this device</h2>
+    ${why ? `<p class="warn-line">${why}</p>` : ''}
+    <p>Your bookings stay in the private repository. This page holds none of
+    them, so it needs a token to read them.</p>
+    <ol>
+      <li><a href="${create}" target="_blank" rel="noopener">Create a
+      fine-grained token</a> on GitHub.</li>
+      <li>Repository access: <b>only</b> <code>${CFG.owner}/${CFG.repo}</code>.</li>
+      <li>Permissions: <b>Contents: read</b>, and <b>Actions: read and
+      write</b> if you want the Check&nbsp;mail button to work.</li>
+      <li>Paste it here. It is kept on this device only.</li>
+    </ol>
+    <div class="tokrow">
+      <input id="tok" type="password" placeholder="github_pat_…"
+             autocomplete="off" spellcheck="false">
+      <button id="save">Connect</button>
+    </div>
+    <p class="fine">Anyone holding this token can read that repository, so
+    treat it like a password and give it an expiry you are happy with.</p>
+  `);
+  document.getElementById('save').onclick = async () => {
+    const v = document.getElementById('tok').value.trim();
+    if (!v) return;
+    setToken(v);
+    sh('<h2>Connecting…</h2>');
+    try {
+      boot(await fetchPayload());
+      status('Up to date');
+    } catch (e) {
+      setToken('');
+      askForToken(message(e));
+    }
+  };
+  document.getElementById('tok').addEventListener('keydown', e => {
+    if (e.key === 'Enter') document.getElementById('save').click();
+  });
+}
+
+async function start() {
+  const cached = LS.get(K.data);
+
+  // Offline first: show what we had before asking the network anything.
+  if (cached) {
+    try {
+      boot(JSON.parse(cached));
+      status('As of ' + ago(LS.get(K.at)));
+    } catch (e) { LS.del(K.data); }
+  }
+
+  if (!token()) {
+    if (!cached) askForToken('');
+    else status('As of ' + ago(LS.get(K.at)) + ' — not connected', 'warn');
+    return;
+  }
+
+  try {
+    boot(await fetchPayload());
+    status('Up to date');
+  } catch (e) {
+    if (e.message === 'token-bad' || e.message === 'token-scope') {
+      if (!cached) { setToken(''); askForToken(message(e)); }
+      else status(message(e), 'warn');
+      return;
+    }
+    if (cached) status('As of ' + ago(LS.get(K.at)) + ' — offline', 'warn');
+    else sh(`<h2>No connection</h2><p>Nothing is cached on this device yet,
+             so there is nothing to show until you are online.</p>`);
+  }
+}
+
+if ('serviceWorker' in navigator)
+  addEventListener('load', () => navigator.serviceWorker
+    .register('sw.js').catch(() => {}));
+
+start();
+</script>
+</body></html>

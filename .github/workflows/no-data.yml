@@ -1,0 +1,21 @@
+name: Refuse to host travel data
+
+# The shell is generated with a guard, and the generator is the only thing
+# that should ever write here. This is the backstop for the day someone - me,
+# most likely - pushes a file by hand.
+
+on: [push, workflow_dispatch]
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Look for anything that should not be public
+        run: |
+          if grep -rlE '"(pnrs|passengers|booking_id)"|__TRIPS__ =' \
+               --include='*.html' --include='*.js' --include='*.json' .; then
+            echo "::error::travel data in a public repository"
+            exit 1
+          fi
+          echo "clean"
