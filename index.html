@@ -1450,8 +1450,9 @@ function askForToken(why) {
     <p class="fine">Anyone holding this token can read that repository, so
     treat it like a password and give it an expiry you are happy with.
     ${already ? `<br><a href="#" id="forget">Forget the token on this
-    device</a>${LS.get(K.data) ? ' &middot; <a href="#" id="back">back to my
-    trips</a>' : ''}` : ''}</p>
+    device</a>${LS.get(K.data)
+      ? ` &middot; <a href="#" id="back">back to my trips</a>`
+      : ''}` : ''}</p>
   `);
   const forget = document.getElementById('forget');
   if (forget) forget.onclick = ev => {
