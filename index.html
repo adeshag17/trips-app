@@ -1310,11 +1310,12 @@ function status(text, kind) {
   b.innerHTML =
     `<span class="as">${text}</span>` +
     `<button id="refresh" class="refresh">Check mail</button>` +
-    `<button id="signout" class="linky" title="Forget the token">⋯</button>`;
+    // Named, not a "⋯". A token expires or gets replaced, and the way to
+    // paste a new one should not be something you have to guess at.
+    `<button id="settings" class="linky"
+       title="Paste a different token">token</button>`;
   document.getElementById('refresh').onclick = refresh;
-  document.getElementById('signout').onclick = () => {
-    if (confirm('Forget the token on this device?')) { setToken(''); start(); }
-  };
+  document.getElementById('settings').onclick = () => askForToken('');
 }
 
 async function api(path, init) {
@@ -1425,11 +1426,13 @@ function askForToken(why) {
   show('shell');
   bar().className = 'appbar';
   bar().innerHTML = '<span class="as">Not connected</span>';
+  const already = !!token();
   sh(`
-    <h2>Connect this device</h2>
+    <h2>${already ? 'Use a different token' : 'Connect this device'}</h2>
     ${why ? `<p class="warn-line">${why}</p>` : ''}
     <p>Your bookings stay in the private repository. This page holds none of
-    them, so it needs a token to read them.</p>
+    them, so it needs a token to read them.${already ? ' Pasting a new one '
+    + 'replaces the one on this device.' : ''}</p>
     <ol>
       <li><a href="${create}" target="_blank" rel="noopener">Create a
       fine-grained token</a> on GitHub.</li>
@@ -1445,18 +1448,35 @@ function askForToken(why) {
       <button id="save">Connect</button>
     </div>
     <p class="fine">Anyone holding this token can read that repository, so
-    treat it like a password and give it an expiry you are happy with.</p>
+    treat it like a password and give it an expiry you are happy with.
+    ${already ? `<br><a href="#" id="forget">Forget the token on this
+    device</a>${LS.get(K.data) ? ' &middot; <a href="#" id="back">back to my
+    trips</a>' : ''}` : ''}</p>
   `);
+  const forget = document.getElementById('forget');
+  if (forget) forget.onclick = ev => {
+    ev.preventDefault();
+    if (confirm('Forget the token on this device?')) { setToken(''); start(); }
+  };
+  const back = document.getElementById('back');
+  if (back) back.onclick = ev => {
+    ev.preventDefault();
+    try { boot(JSON.parse(LS.get(K.data))); status('As of ' + ago(LS.get(K.at)));
+    } catch (e) { /* nothing cached after all */ }
+  };
   document.getElementById('save').onclick = async () => {
     const v = document.getElementById('tok').value.trim();
     if (!v) return;
+    // If the new one turns out to be wrong, the working one it replaced
+    // should still be there afterwards.
+    const prev = token();
     setToken(v);
     sh('<h2>Connecting…</h2>');
     try {
       boot(await fetchPayload());
       status('Up to date');
     } catch (e) {
-      setToken('');
+      setToken(prev);
       askForToken(message(e));
     }
   };
