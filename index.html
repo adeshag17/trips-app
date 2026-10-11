@@ -914,30 +914,11 @@ function docLinks(r){
   // the one holding the ticket, Gmail drops the message and shows an
   // inbox. authuser names the account; searching by the message's own
   // RFC822 id finds it wherever it has been filed.
-  // Finding the message again. The API's own id is not what Gmail's web
-  // interface addresses a message by; its RFC822 Message-ID is, through
-  // search, whichever account happens to be signed in first.
-  const q = r.source_rfc ? 'rfc822msgid:' + r.source_rfc
-          : r.source_message ? '' : null;
-  if (q !== null){
-    const url = q
-      ? `https://mail.google.com/mail/u/?authuser=${esc(D.mailbox)}` +
-        `#search/${encodeURIComponent(q)}`
-      : `https://mail.google.com/mail/u/?authuser=${esc(D.mailbox)}` +
-        `#all/${esc(r.source_message)}`;
-    // On a phone that link opens the Gmail app, which cannot act on a URL
-    // fragment and drops you in the inbox - which is exactly what it did.
-    // So on a touch device the search term goes to the clipboard first and
-    // Gmail's own search box is one paste away.
-    if (q && TOUCH)
-      out.push(`<button class="mailq linkish" data-q="${esc(q)}"
-        data-url="${esc(url)}"
-        title="Copy the search and open Gmail">mail ↗</button>`);
-    else
-      out.push(`<a href="${url}" target="_blank" rel="noopener"
-        onclick="event.stopPropagation()"
-        title="The confirmation email in ${esc(D.mailbox)}">mail ↗</a>`);
-  }
+  // No link to the email. Gmail's web interface can only be sent to a
+  // message by a URL fragment, and on a phone the link is taken over by the
+  // Gmail app, which ignores the fragment and opens the inbox - so the link
+  // did nothing but promise. source_rfc is still captured on every sync, so
+  // this can come back the day there is a way to honour it.
   return out.length ? out.join(' ') : '<span class="dim">--</span>';
 }
 
@@ -1243,16 +1224,6 @@ document.addEventListener('click', e => {
     });
     return;
   }
-  const mq = e.target.closest('.mailq');
-  if (mq){
-    e.preventDefault(); e.stopPropagation();
-    Promise.resolve(copyText(mq.dataset.q)).then(ok => {
-      flash(ok ? 'Search copied — paste it in Gmail'
-               : `Search Gmail for ${mq.dataset.q}`);
-      window.open(mq.dataset.url, '_blank', 'noopener');
-    });
-    return;
-  }
   const o = e.target.closest('[data-open]');
   if (o && o.dataset.open && !o.dataset.open.startsWith('|')) openDrawer(o.dataset.open);
 });
@@ -1271,7 +1242,7 @@ if (D) render();
 // page before the network is consulted at all.
 // ---------------------------------------------------------------------------
 
-const CFG = {"owner":"adeshag17","repo":"vietnam-flights","ref":"master","workflow":"sync-mail.yml","payload":"data/trips-payload.json","shell":"9"};
+const CFG = {"owner":"adeshag17","repo":"vietnam-flights","ref":"master","workflow":"sync-mail.yml","payload":"data/trips-payload.json","shell":"10"};
 
 const K = {token: 'ft.token', data: 'ft.payload', at: 'ft.payload.at'};
 
