@@ -306,6 +306,8 @@ footer{color:var(--dim);font-size:12px;margin-top:26px;line-height:1.6}
 .appbar button{font:inherit;cursor:pointer;border-radius:7px}
 .appbar .refresh{background:#1b2a47;color:#cfe3ff;border:1px solid #2c4877;
   padding:5px 11px}
+.appbar .update{background:#2f4a22;border-color:#4a7336;color:#d6f5c6}
+.appbar .ver{font-size:11px;color:var(--dim);opacity:.8}
 .appbar .refresh:disabled{opacity:.6;cursor:default}
 .appbar .linky{background:none;color:#cfe3ff;border:1px solid var(--line);
   padding:5px 10px;font-size:12px}
@@ -1265,7 +1267,7 @@ if (D) render();
 // page before the network is consulted at all.
 // ---------------------------------------------------------------------------
 
-const CFG = {"owner":"adeshag17","repo":"vietnam-flights","ref":"master","workflow":"sync-mail.yml","payload":"data/trips-payload.json","shell":"7"};
+const CFG = {"owner":"adeshag17","repo":"vietnam-flights","ref":"master","workflow":"sync-mail.yml","payload":"data/trips-payload.json","shell":"8"};
 
 const K = {token: 'ft.token', data: 'ft.payload', at: 'ft.payload.at'};
 
@@ -1309,6 +1311,7 @@ function status(text, kind) {
   b.className = 'appbar ' + (kind || '');
   b.innerHTML =
     `<span class="as">${text}</span>` +
+    `<span class="ver" title="Which copy of the app this is">v${CFG.shell}</span>` +
     `<button id="refresh" class="refresh">Check mail</button>` +
     // Named, not a "⋯". A token expires or gets replaced, and the way to
     // paste a new one should not be something you have to guess at.
@@ -1696,10 +1699,50 @@ async function appendEdit(entry) {
 
 window.__editHook = openEditor;
 
+// ---------------------------------------------------------------------------
+// Replacing itself.
+//
+// A copy cached on a phone cannot be reasoned with from here, and on iOS an
+// app added to the home screen keeps its own website data - clearing Safari
+// does nothing to it. So the app checks a plain text file for the current
+// version on every start, and when it is behind it offers one tap that tears
+// out the workers and caches and reloads. Without this, a fix cannot reach
+// the device that needs it, which is the only device that matters.
+// ---------------------------------------------------------------------------
+
+async function checkForUpdate() {
+  let latest;
+  try {
+    const r = await fetch('version.txt?t=' + Date.now(), {cache: 'no-store'});
+    if (!r.ok) return;
+    latest = (await r.text()).trim();
+  } catch (e) { return; }
+  if (!latest || latest === String(CFG.shell)) return;
+
+  const b = bar();
+  if (!b) return;
+  const note = document.createElement('button');
+  note.className = 'refresh update';
+  note.textContent = `Update to v${latest}`;
+  note.onclick = async () => {
+    note.disabled = true;
+    note.textContent = 'Updating…';
+    try {
+      const regs = await navigator.serviceWorker.getRegistrations();
+      await Promise.all(regs.map(r => r.unregister()));
+      const keys = await caches.keys();
+      await Promise.all(keys.map(k => caches.delete(k)));
+    } catch (e) { /* nothing cached to clear */ }
+    location.replace('./?v=' + encodeURIComponent(latest));
+  };
+  b.appendChild(note);
+}
+
 if ('serviceWorker' in navigator)
   addEventListener('load', () => navigator.serviceWorker
     .register('sw.js').catch(() => {}));
 
 start();
+checkForUpdate();
 </script>
 </body></html>

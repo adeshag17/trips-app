@@ -2,7 +2,7 @@
 // Cache the shell, never the data. The payload is one fetch away and lives in
 // localStorage; caching API responses here would mean two stale copies to
 // reason about instead of one.
-const SHELL = 'trips-shell-7';
+const SHELL = 'trips-shell-8';
 const FILES = ['./', './index.html', './manifest.webmanifest', './icon.svg'];
 
 self.addEventListener('install', e => {
@@ -26,6 +26,10 @@ self.addEventListener('fetch', e => {
   // serving it, or worse, storing it under './index.html' as the navigation
   // branch below would - is how an escape hatch stops being one.
   if (url.pathname.endsWith('reset.html')) return;
+  // version.txt is how a stale copy learns it is stale. Serving it from the
+  // stale copy's own cache would answer the question with the wrong answer,
+  // for ever.
+  if (url.pathname.endsWith('version.txt')) return;
 
   // The page itself: network first, cache as the fallback. Cache-first left
   // an installed app running an old shell until the service worker happened
