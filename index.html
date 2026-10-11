@@ -1265,7 +1265,7 @@ if (D) render();
 // page before the network is consulted at all.
 // ---------------------------------------------------------------------------
 
-const CFG = {"owner":"adeshag17","repo":"vietnam-flights","ref":"master","workflow":"sync-mail.yml","payload":"data/trips-payload.json"};
+const CFG = {"owner":"adeshag17","repo":"vietnam-flights","ref":"master","workflow":"sync-mail.yml","payload":"data/trips-payload.json","shell":"6"};
 
 const K = {token: 'ft.token', data: 'ft.payload', at: 'ft.payload.at'};
 
@@ -1447,7 +1447,8 @@ function askForToken(why) {
              autocomplete="off" spellcheck="false">
       <button id="save">Connect</button>
     </div>
-    <p class="fine">Anyone holding this token can read that repository, so
+    <p class="fine">Shell ${CFG.shell}. Anyone holding this token can read
+    that repository, so
     treat it like a password and give it an expiry you are happy with.
     ${already ? `<br><a href="#" id="forget">Forget the token on this
     device</a>${LS.get(K.data)

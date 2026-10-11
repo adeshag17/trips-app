@@ -2,7 +2,7 @@
 // Cache the shell, never the data. The payload is one fetch away and lives in
 // localStorage; caching API responses here would mean two stale copies to
 // reason about instead of one.
-const SHELL = 'trips-shell-5';
+const SHELL = 'trips-shell-6';
 const FILES = ['./', './index.html', './manifest.webmanifest', './icon.svg'];
 
 self.addEventListener('install', e => {
@@ -21,6 +21,11 @@ self.addEventListener('fetch', e => {
   const url = new URL(e.request.url);
   if (e.request.method !== 'GET') return;
   if (url.origin !== self.location.origin) return;   // the GitHub API
+
+  // reset.html is the escape hatch from a bad cache. Touching it here -
+  // serving it, or worse, storing it under './index.html' as the navigation
+  // branch below would - is how an escape hatch stops being one.
+  if (url.pathname.endsWith('reset.html')) return;
 
   // The page itself: network first, cache as the fallback. Cache-first left
   // an installed app running an old shell until the service worker happened
