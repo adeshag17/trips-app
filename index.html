@@ -106,6 +106,10 @@ td.docs a{margin-right:7px}
   border:1px solid var(--line);background:var(--card);color:var(--dim);
   cursor:pointer;opacity:0;transition:opacity .12s}
 tr:hover .editrow{opacity:1}
+/* No hover on a phone, and an edit button nobody can see is not a feature. */
+@media (hover: none){ .editrow{opacity:1} }
+.linkish{font:inherit;background:none;border:none;padding:0;cursor:pointer;
+  color:var(--accent);text-decoration:underline;text-underline-offset:2px}
 .editrow:hover{border-color:var(--accent);color:var(--accent)}
 a.place{text-decoration:none;color:inherit;border-bottom:1px dotted var(--dim)}
 a.place:hover{color:var(--accent);border-bottom-color:var(--accent)}
@@ -318,10 +322,45 @@ footer{color:var(--dim);font-size:12px;margin-top:26px;line-height:1.6}
   border:1px solid var(--line);background:#0f1422;color:inherit}
 .tokrow button{font:inherit;padding:9px 16px;border-radius:8px;cursor:pointer;
   background:#1b2a47;color:#cfe3ff;border:1px solid #2c4877}
+
+/* The editor. A sheet off the bottom, because this is mostly a phone. */
+#appedit{position:fixed;inset:0;z-index:60;background:rgba(5,8,16,.72);
+  display:flex;align-items:flex-end;justify-content:center}
+#appedit .sheet{width:100%;max-width:560px;max-height:88vh;overflow:auto;
+  background:var(--card);border:1px solid var(--line);
+  border-radius:16px 16px 0 0;padding:16px 16px calc(16px + env(safe-area-inset-bottom))}
+#appedit .sheethead{display:flex;align-items:center;gap:10px;margin-bottom:12px}
+#appedit .sheethead b{flex:1;font-size:16px}
+#appedit .x{background:none;border:none;color:var(--dim);font-size:24px;
+  line-height:1;cursor:pointer;padding:0 4px}
+#appedit .fld{display:block;margin-bottom:10px}
+#appedit .fld span{display:block;font-size:11px;letter-spacing:.04em;
+  text-transform:uppercase;color:var(--dim);margin-bottom:4px}
+#appedit input{width:100%;box-sizing:border-box;font:inherit;padding:9px 11px;
+  border-radius:8px;border:1px solid var(--line);background:#0f1422;
+  color:inherit}
+#appedit fieldset.seg{border:1px solid var(--line);border-radius:10px;
+  padding:12px;margin:0 0 12px;display:grid;grid-template-columns:1fr 1fr;
+  gap:10px;min-width:0}
+#appedit fieldset.seg legend{grid-column:1/-1}
+#appedit fieldset.seg .fld{margin:0;min-width:0}
+/* A date and time needs the whole width at 375px; a terminal needs none of
+   it. Anything narrower than this truncates "2026-12-18T22:55" on a phone. */
+#appedit fieldset.seg .fld.wide{grid-column:1/-1}
+#appedit legend{font-size:12px;color:var(--dim);padding:0 6px}
+#appedit .fine{font-size:12px;color:var(--dim);line-height:1.5}
+#appedit .sheetfoot{display:flex;gap:10px;justify-content:flex-end;
+  margin-top:14px}
+#appedit button.go{font:inherit;padding:10px 18px;border-radius:9px;
+  cursor:pointer;background:#1b2a47;color:#cfe3ff;border:1px solid #2c4877}
+#appedit button.go:disabled{opacity:.6;cursor:default}
+#appedit button.ghost{font:inherit;padding:10px 16px;border-radius:9px;
+  cursor:pointer;background:none;color:var(--dim);border:1px solid var(--line)}
 </style>
 </head><body>
 <div id="appbar" class="appbar"><span class="as">Starting…</span></div>
 <div id="shell"><div id="shellmsg"><h2>Starting…</h2></div></div>
+<div id="appedit" hidden></div>
 <noscript><p style="padding:24px">This app needs JavaScript: it fetches your
 bookings from a private repository in the browser.</p></noscript>
 <div class="wrap" hidden>
@@ -354,6 +393,8 @@ const city = c => D.airports[c] || c;
 const term = t => t ? ' <span class="term">' + esc(t) + '</span>' : '';
 const at = (c,t) => esc(c) + (t ? ' ' + t : '');
 const T = s => new Date(s).getTime();
+// No hover, and links to Gmail get taken over by the Gmail app.
+const TOUCH = matchMedia('(hover: none)').matches;
 const HOUR = 3600000, DAY = 86400000;
 
 const SYM = {INR:'₹', SGD:'S$', VND:'₫', USD:'$', EUR:'€'};
@@ -867,16 +908,30 @@ function docLinks(r){
   // the one holding the ticket, Gmail drops the message and shows an
   // inbox. authuser names the account; searching by the message's own
   // RFC822 id finds it wherever it has been filed.
-  if (r.source_rfc)
-    out.push(`<a href="https://mail.google.com/mail/u/?authuser=${esc(D.mailbox)}` +
-      `#search/rfc822msgid:${encodeURIComponent(r.source_rfc)}"
-      target="_blank" rel="noopener" onclick="event.stopPropagation()"
-      title="The confirmation email in ${esc(D.mailbox)}">mail ↗</a>`);
-  else if (r.source_message)
-    out.push(`<a href="https://mail.google.com/mail/u/?authuser=${esc(D.mailbox)}` +
-      `#all/${esc(r.source_message)}"
-      target="_blank" rel="noopener" onclick="event.stopPropagation()"
-      title="The confirmation email in ${esc(D.mailbox)}">mail ↗</a>`);
+  // Finding the message again. The API's own id is not what Gmail's web
+  // interface addresses a message by; its RFC822 Message-ID is, through
+  // search, whichever account happens to be signed in first.
+  const q = r.source_rfc ? 'rfc822msgid:' + r.source_rfc
+          : r.source_message ? '' : null;
+  if (q !== null){
+    const url = q
+      ? `https://mail.google.com/mail/u/?authuser=${esc(D.mailbox)}` +
+        `#search/${encodeURIComponent(q)}`
+      : `https://mail.google.com/mail/u/?authuser=${esc(D.mailbox)}` +
+        `#all/${esc(r.source_message)}`;
+    // On a phone that link opens the Gmail app, which cannot act on a URL
+    // fragment and drops you in the inbox - which is exactly what it did.
+    // So on a touch device the search term goes to the clipboard first and
+    // Gmail's own search box is one paste away.
+    if (q && TOUCH)
+      out.push(`<button class="mailq linkish" data-q="${esc(q)}"
+        data-url="${esc(url)}"
+        title="Copy the search and open Gmail">mail ↗</button>`);
+    else
+      out.push(`<a href="${url}" target="_blank" rel="noopener"
+        onclick="event.stopPropagation()"
+        title="The confirmation email in ${esc(D.mailbox)}">mail ↗</a>`);
+  }
   return out.length ? out.join(' ') : '<span class="dim">--</span>';
 }
 
@@ -1098,6 +1153,14 @@ function render(){
   };
   document.querySelectorAll('[data-edit]').forEach(b => b.onclick = async (e) => {
     e.stopPropagation();
+    // The hosted app has no review desk behind it, so it installs its own
+    // editor. Served locally, nothing changes: the review card is better
+    // than anything a drawer can be, and it is already there.
+    if (window.__editHook){
+      const [vendor, id] = b.dataset.edit.split('|');
+      window.__editHook(vendor, id);
+      return;
+    }
     b.disabled = true;
     const r = await fetch('/api/review-edit', {
       method: 'POST',
@@ -1171,6 +1234,16 @@ document.addEventListener('click', e => {
       flash(ok ? `${pnr} copied — opening check-in`
                : `Could not copy; the reference is ${pnr}`);
       window.open(ci.dataset.url, '_blank', 'noopener');
+    });
+    return;
+  }
+  const mq = e.target.closest('.mailq');
+  if (mq){
+    e.preventDefault(); e.stopPropagation();
+    Promise.resolve(copyText(mq.dataset.q)).then(ok => {
+      flash(ok ? 'Search copied — paste it in Gmail'
+               : `Search Gmail for ${mq.dataset.q}`);
+      window.open(mq.dataset.url, '_blank', 'noopener');
     });
     return;
   }
@@ -1361,8 +1434,9 @@ function askForToken(why) {
       <li><a href="${create}" target="_blank" rel="noopener">Create a
       fine-grained token</a> on GitHub.</li>
       <li>Repository access: <b>only</b> <code>${CFG.owner}/${CFG.repo}</code>.</li>
-      <li>Permissions: <b>Contents: read</b>, and <b>Actions: read and
-      write</b> if you want the Check&nbsp;mail button to work.</li>
+      <li>Permissions: <b>Contents: read and write</b> (write is what lets
+      you correct a booking from here), and <b>Actions: read and write</b>
+      for the Check&nbsp;mail button.</li>
       <li>Paste it here. It is kept on this device only.</li>
     </ol>
     <div class="tokrow">
@@ -1423,6 +1497,169 @@ async function start() {
                so there is nothing to show until you are online.</p>`); }
   }
 }
+
+// ---------------------------------------------------------------------------
+// Editing from the phone.
+//
+// The local page posts to the review desk; there is no review desk behind a
+// static site. So an edit here is written to data/app-edits.jsonl in the
+// private repository and applied by the next sync, which is also what
+// rebuilds the payload. Doing it that way means the merge rules stay in
+// Python, in one place, instead of being half re-implemented in a phone
+// browser where they would quietly diverge.
+// ---------------------------------------------------------------------------
+
+const EDITS = 'data/app-edits.jsonl';
+
+function findBooking(vendor, id) {
+  for (const t of (D.trips || []))
+    for (const b of (t.bookings || []))
+      if (b.vendor === vendor && b.booking_id === id) return b;
+  return null;
+}
+
+// `wide` means the field takes the whole row of a segment: a date and time
+// does not fit in half of 375px, a terminal needs nothing like it.
+const field = (label, name, value, opt) => {
+  opt = opt || {};
+  return `
+  <label class="fld${opt.wide ? ' wide' : ''}"><span>${label}</span>
+    <input name="${name}" value="${esc(value == null ? '' : value)}"
+           ${opt.attrs || ''} autocomplete="off" spellcheck="false"></label>`;
+};
+
+function openEditor(vendor, id) {
+  const b = findBooking(vendor, id);
+  if (!b) return;
+
+  const segs = (b.segments || []).map((s, i) => `
+    <fieldset class="seg" data-i="${i}">
+      <legend>${esc(s.origin || '?')} &rarr; ${esc(s.destination || '?')}</legend>
+      ${field('Flight', `flight_no.${i}`, s.flight_no, {wide: true})}
+      ${field('Departs', `depart.${i}`, s.depart,
+              {wide: true, attrs: 'placeholder="2026-12-18T22:55"'})}
+      ${field('Arrives', `arrive.${i}`, s.arrive,
+              {wide: true, attrs: 'placeholder="2026-12-19T06:55"'})}
+      ${field('Departure terminal', `dep_terminal.${i}`, s.dep_terminal)}
+      ${field('Arrival terminal', `arr_terminal.${i}`, s.arr_terminal)}
+    </fieldset>`).join('');
+
+  const host = document.getElementById('appedit');
+  host.hidden = false;
+  host.innerHTML = `
+    <div class="sheet">
+      <div class="sheethead">
+        <b>${esc(b.route || b.address || b.vendor)}</b>
+        <button class="x" id="ed-close" title="Close">&times;</button>
+      </div>
+      <form id="ed-form">
+        ${field('Reference', 'pnrs', (b.pnrs || []).join(', '))}
+        ${field('Paid', 'paid', b.paid, {attrs: 'inputmode="decimal"'})}
+        ${field('Currency', 'currency', b.currency)}
+        ${segs}
+        <p class="fine">Saved to the private repository and applied by the
+        next sync, which runs straight after. Anything left as it is stays as
+        it is.</p>
+        <div class="sheetfoot">
+          <button type="button" class="ghost" id="ed-cancel">Cancel</button>
+          <button type="submit" class="go" id="ed-save">Save</button>
+        </div>
+      </form>
+    </div>`;
+
+  const close = () => { host.hidden = true; host.innerHTML = ''; };
+  document.getElementById('ed-close').onclick = close;
+  document.getElementById('ed-cancel').onclick = close;
+
+  document.getElementById('ed-form').onsubmit = async ev => {
+    ev.preventDefault();
+    const form = ev.target;
+    const val = n => (form.querySelector(`[name="${n}"]`) || {}).value;
+
+    // Only what actually changed. A patch that restates every field would
+    // overwrite a correction the parser made in the meantime.
+    const fields = {};
+    const pnrs = (val('pnrs') || '').split(',').map(s => s.trim()).filter(Boolean);
+    if (pnrs.join(', ') !== (b.pnrs || []).join(', ')) fields.pnrs = pnrs;
+    if (val('paid') !== String(b.paid)) {
+      const n = parseFloat(val('paid'));
+      if (!isNaN(n)) fields.paid = n;
+    }
+    if (val('currency') !== b.currency) fields.currency = val('currency');
+
+    const segments = {};
+    (b.segments || []).forEach((s, i) => {
+      const got = {};
+      ['flight_no', 'depart', 'arrive', 'dep_terminal', 'arr_terminal']
+        .forEach(k => {
+          const v = val(`${k}.${i}`);
+          if (v !== undefined && v !== (s[k] || '')) got[k] = v;
+        });
+      if (Object.keys(got).length) segments[i] = got;
+    });
+
+    if (!Object.keys(fields).length && !Object.keys(segments).length) {
+      close();
+      return;
+    }
+
+    const btn = document.getElementById('ed-save');
+    btn.disabled = true;
+    btn.textContent = 'Saving…';
+    try {
+      await appendEdit({
+        id: (crypto.randomUUID ? crypto.randomUUID()
+                               : String(Date.now()) + Math.random()),
+        at: new Date().toISOString(),
+        from: 'app',
+        vendor: b.vendor, booking_id: b.booking_id,
+        fields: fields, segments: segments,
+      });
+    } catch (e) {
+      btn.disabled = false;
+      btn.textContent = 'Save';
+      alert(message(e) + '. Contents: write is needed on the token to edit.');
+      return;
+    }
+    close();
+    status('Saved — applying…');
+    refresh();                       // the sync applies it and rebuilds
+  };
+}
+
+// base64 of UTF-8: btoa alone mangles anything above ASCII, and these files
+// carry Vietnamese place names.
+function b64(text) {
+  const bytes = new TextEncoder().encode(text);
+  let s = '';
+  bytes.forEach(c => { s += String.fromCharCode(c); });
+  return btoa(s);
+}
+
+async function appendEdit(entry) {
+  let sha, existing = '';
+  try {
+    const r = await api(`/repos/${CFG.owner}/${CFG.repo}/contents/${EDITS}`
+                        + `?ref=${CFG.ref}`);
+    const j = await r.json();
+    sha = j.sha;
+    existing = new TextDecoder().decode(
+      Uint8Array.from(atob(j.content.replace(/\n/g, '')), c => c.charCodeAt(0)));
+  } catch (e) {
+    if (e.message !== 'token-scope') throw e;   // 404: the first edit ever
+  }
+
+  const body = {
+    message: `Edit ${entry.vendor} ${entry.booking_id} from the app`,
+    content: b64(existing + JSON.stringify(entry) + '\n'),
+    branch: CFG.ref,
+  };
+  if (sha) body.sha = sha;
+  await api(`/repos/${CFG.owner}/${CFG.repo}/contents/${EDITS}`,
+            {method: 'PUT', body: JSON.stringify(body)});
+}
+
+window.__editHook = openEditor;
 
 if ('serviceWorker' in navigator)
   addEventListener('load', () => navigator.serviceWorker
