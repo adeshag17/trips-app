@@ -307,8 +307,8 @@ footer{color:var(--dim);font-size:12px;margin-top:26px;line-height:1.6}
 .appbar .refresh{background:#1b2a47;color:#cfe3ff;border:1px solid #2c4877;
   padding:5px 11px}
 .appbar .refresh:disabled{opacity:.6;cursor:default}
-.appbar .linky{background:none;border:none;color:var(--dim);padding:4px 6px;
-  font-size:16px}
+.appbar .linky{background:none;color:#cfe3ff;border:1px solid var(--line);
+  padding:5px 10px;font-size:12px}
 #shell{max-width:620px;margin:0 auto;padding:28px 18px 60px}
 #shell h2{font-size:20px;margin:0 0 12px}
 #shell p,#shell li{color:var(--dim);line-height:1.55}
@@ -1265,7 +1265,7 @@ if (D) render();
 // page before the network is consulted at all.
 // ---------------------------------------------------------------------------
 
-const CFG = {"owner":"adeshag17","repo":"vietnam-flights","ref":"master","workflow":"sync-mail.yml","payload":"data/trips-payload.json","shell":"6"};
+const CFG = {"owner":"adeshag17","repo":"vietnam-flights","ref":"master","workflow":"sync-mail.yml","payload":"data/trips-payload.json","shell":"7"};
 
 const K = {token: 'ft.token', data: 'ft.payload', at: 'ft.payload.at'};
 
@@ -1326,10 +1326,18 @@ async function api(path, init) {
       'X-GitHub-Api-Version': '2022-11-28',
     },
   }, init || {}));
-  if (r.status === 401) throw new Error('token-bad');
-  if (r.status === 404) throw new Error('token-scope');
-  if (r.status === 403) throw new Error('token-forbidden');
-  if (!r.ok) throw new Error('http-' + r.status);
+  if (!r.ok) {
+    const kind = r.status === 401 ? 'token-bad'
+               : r.status === 404 ? 'token-scope'
+               : r.status === 403 ? 'token-forbidden'
+               : 'http-' + r.status;
+    const err = new Error(kind);
+    err.status = r.status;
+    // GitHub says why, and guessing from the status code alone has cost
+    // enough time already.
+    try { err.detail = (await r.json()).message || ''; } catch (x) {}
+    throw err;
+  }
   return r;
 }
 
@@ -1407,15 +1415,18 @@ async function refresh() {
 }
 
 function message(e) {
+  const said = e && e.status
+    ? ` (HTTP ${e.status}${e.detail ? ': ' + e.detail : ''})` : '';
   switch (e && e.message) {
     case 'token-bad':
-      return 'That token is not valid any more';
+      return 'GitHub rejected that token' + said;
     case 'token-scope':
-      return 'The token cannot see this repository';
+      return `No access to ${CFG.owner}/${CFG.repo}, or it has no `
+             + `${CFG.payload} yet` + said;
     case 'token-forbidden':
-      return 'The token lacks permission for that (Actions: write)';
+      return 'The token lacks a permission it needs' + said;
     default:
-      return 'No connection';
+      return (e && e.status) ? 'GitHub said no' + said : 'No connection';
   }
 }
 
@@ -1509,8 +1520,10 @@ async function start() {
     status('Up to date');
   } catch (e) {
     if (e.message === 'token-bad' || e.message === 'token-scope') {
-      if (!cached) { setToken(''); askForToken(message(e)); }
-      else status(message(e), 'warn');
+      // Put the box to paste a new one in front of them. Leaving a dim
+      // sentence in the bar and the only way forward behind a grey button
+      // reads as an app that has died, which is exactly how it was read.
+      askForToken(message(e));
       return;
     }
     if (cached) status('As of ' + ago(LS.get(K.at)) + ' — offline', 'warn');
