@@ -1266,7 +1266,13 @@ document.addEventListener('click', e => {
   if (o && o.dataset.open && !o.dataset.open.startsWith('|')) openDrawer(o.dataset.open);
 });
 document.addEventListener('keydown', e => { if (e.key === 'Escape') closeDrawer(); });
-addEventListener('resize', () => { if (D) paintTimeline(D.trips[active]); });
+// A phone fires resize continuously while the address bar slides away, and
+// each one rebuilds the whole timeline. Wait for the end of the gesture.
+let repaint;
+addEventListener('resize', () => {
+  clearTimeout(repaint);
+  repaint = setTimeout(() => { if (D) paintTimeline(D.trips[active]); }, 120);
+});
 
 window.__boot = data => { D = data; active = 0; render(); };
 if (D) render();
@@ -1280,9 +1286,10 @@ if (D) render();
 // page before the network is consulted at all.
 // ---------------------------------------------------------------------------
 
-const CFG = {"owner":"adeshag17","repo":"vietnam-flights","ref":"master","workflow":"sync-mail.yml","payload":"data/trips-payload.json","shell":"12"};
+const CFG = {"owner":"adeshag17","repo":"vietnam-flights","ref":"master","workflow":"sync-mail.yml","payload":"data/trips-payload.json","shell":"13"};
 
-const K = {token: 'ft.token', data: 'ft.payload', at: 'ft.payload.at'};
+const K = {token: 'ft.token', data: 'ft.payload', at: 'ft.payload.at',
+           etag: 'ft.payload.etag'};
 
 // localStorage throws outright in some privacy modes, and an uncaught throw
 // here would take the whole page down with it.
@@ -1366,19 +1373,46 @@ function boot(data) {
   show('trips');
 }
 
+// Thrown when the server says the cached copy is still current.
+const UNCHANGED = 'unchanged';
+
 async function fetchPayload() {
-  const r = await api(`/repos/${CFG.owner}/${CFG.repo}/contents/${CFG.payload}`
-                      + `?ref=${CFG.ref}`,
-                      {headers: {
-                        'Authorization': 'Bearer ' + token(),
-                        'Accept': 'application/vnd.github.raw',
-                        'X-GitHub-Api-Version': '2022-11-28',
-                      }});
+  const headers = {
+    'Authorization': 'Bearer ' + token(),
+    'Accept': 'application/vnd.github.raw',
+    'X-GitHub-Api-Version': '2022-11-28',
+  };
+  // Most opens find nothing new. Sending the tag of what we hold turns that
+  // into an empty 304 instead of the whole payload again - and GitHub does
+  // not count a 304 against the hourly rate limit either.
+  const tag = LS.get(K.etag);
+  if (tag && LS.get(K.data)) headers['If-None-Match'] = tag;
+
+  const r = await fetch('https://api.github.com'
+    + `/repos/${CFG.owner}/${CFG.repo}/contents/${CFG.payload}?ref=${CFG.ref}`,
+    {headers: headers});
+
+  if (r.status === 304) {
+    LS.set(K.at, new Date().toISOString());
+    throw new Error(UNCHANGED);
+  }
+  if (!r.ok) {
+    const kind = r.status === 401 ? 'token-bad'
+               : r.status === 404 ? 'token-scope'
+               : r.status === 403 ? 'token-forbidden'
+               : 'http-' + r.status;
+    const err = new Error(kind);
+    err.status = r.status;
+    try { err.detail = (await r.json()).message || ''; } catch (x) {}
+    throw err;
+  }
+
   const text = await r.text();
-  JSON.parse(text);                       // fail here, not after we cache it
+  const data = JSON.parse(text);          // fail here, not after we cache it
   LS.set(K.data, text);
+  LS.set(K.etag, r.headers.get('ETag') || '');
   LS.set(K.at, new Date().toISOString());
-  return JSON.parse(text);
+  return data;
 }
 
 async function refresh() {
@@ -1423,7 +1457,9 @@ async function refresh() {
       boot(await fetchPayload());
       status('Checked just now');
     } catch (e) {
-      status(message(e), 'warn');
+      status(e.message === UNCHANGED ? 'Checked just now — nothing new'
+                                     : message(e),
+             e.message === UNCHANGED ? '' : 'warn');
     }
     return;
   }
@@ -1485,7 +1521,8 @@ function askForToken(why) {
   const forget = document.getElementById('forget');
   if (forget) forget.onclick = ev => {
     ev.preventDefault();
-    if (confirm('Forget the token on this device?')) { setToken(''); start(); }
+    if (confirm('Forget the token on this device?')) {
+      setToken(''); LS.del(K.etag); start(); }
   };
   const back = document.getElementById('back');
   if (back) back.onclick = ev => {
@@ -1505,6 +1542,11 @@ function askForToken(why) {
       boot(await fetchPayload());
       status('Up to date');
     } catch (e) {
+      if (e.message === UNCHANGED) {      // a new token, the same data
+        boot(JSON.parse(LS.get(K.data)));
+        status('Up to date');
+        return;
+      }
       setToken(prev);
       askForToken(message(e));
     }
@@ -1535,6 +1577,7 @@ async function start() {
     boot(await fetchPayload());
     status('Up to date');
   } catch (e) {
+    if (e.message === UNCHANGED) { status('Up to date'); return; }
     if (e.message === 'token-bad' || e.message === 'token-scope') {
       // Put the box to paste a new one in front of them. Leaving a dim
       // sentence in the bar and the only way forward behind a grey button

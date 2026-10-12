@@ -2,7 +2,7 @@
 // Cache the shell, never the data. The payload is one fetch away and lives in
 // localStorage; caching API responses here would mean two stale copies to
 // reason about instead of one.
-const SHELL = 'trips-shell-12';
+const SHELL = 'trips-shell-13';
 const FILES = ['./', './index.html', './manifest.webmanifest', './icon.svg'];
 
 self.addEventListener('install', e => {
