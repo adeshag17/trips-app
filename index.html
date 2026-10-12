@@ -171,6 +171,13 @@ footer{color:var(--dim);font-size:12px;margin-top:26px;line-height:1.6}
 .hero .where{font-size:13px;opacity:.92;margin-top:3px;
   text-shadow:0 1px 8px #000b}
 .hero .sp{flex:1}
+.renamer{font:inherit;font-size:11px;vertical-align:middle;margin-left:10px;
+  padding:2px 8px;border-radius:6px;cursor:pointer;background:#ffffff26;
+  border:1px solid #ffffff55;color:#fff;opacity:0;transition:opacity .12s}
+.hero:hover .renamer{opacity:1}
+@media (hover: none){ .renamer{opacity:.9} }
+#tn{font:inherit;font-size:22px;padding:2px 8px;border-radius:7px;
+  border:1px solid #ffffff66;background:#00000066;color:#fff;max-width:min(420px,70vw)}
 .hero button.act{background:#ffffff26;border-color:#ffffff66;color:#fff;
   backdrop-filter:blur(4px)}
 .hero button.act:hover{background:#ffffff3d;border-color:#fff;color:#fff}
@@ -568,7 +575,9 @@ function hero(t){
     ${img && t.image.credit ? `<a class="credit" target="_blank" rel="noopener"
        href="${esc(t.image.href || '#')}">${esc(t.image.credit)}</a>` : ''}
     <div class="in">
-      <div><h1>${esc(t.name)}</h1>
+      <div><h1 id="tripname">${esc(t.name)}
+        <button class="renamer" id="rename" title="Rename this trip">rename</button>
+      </h1>
         <div class="where">${esc(sub)}</div></div>
       <div class="sp"></div>
       ${t.pending_count ? `<span class="count">${t.pending_count} still to book</span>` : ''}
@@ -1156,6 +1165,39 @@ function render(){
       + 'The page has to be served by `python flights.py serve`.');
   });
 
+  const ren = el('#rename');
+  if (ren) ren.onclick = () => {
+    const h = el('#tripname');
+    const now = t.name;
+    h.innerHTML = `<input id="tn" value="${esc(now)}" spellcheck="false">
+      <button class="act" id="tnsave">Save</button>
+      <button class="act" id="tncancel">Cancel</button>`;
+    const box = el('#tn');
+    box.focus(); box.select();
+    const stop = () => render();
+    el('#tncancel').onclick = stop;
+    el('#tnsave').onclick = async () => {
+      const name = box.value.trim();
+      if (!name || name === now) return stop();
+      // The generated name is the key - "SGN Dec 2026" - because that is
+      // what the grouping produces every time it runs. The display name is
+      // only ever a label over it.
+      if (window.__renameHook) { await window.__renameHook(t.raw_name, name); return; }
+      const r = await fetch('/api/trip-name', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json', 'X-Planner': '1'},
+        body: JSON.stringify({raw: t.raw_name, name: name}),
+      }).then(x => x.json()).catch(() => ({ok: false}));
+      if (r.ok) location.reload();
+      else alert(r.error || 'Could not save that name. The page has to be '
+        + 'served by `python flights.py serve`.');
+    };
+    box.addEventListener('keydown', e => {
+      if (e.key === 'Enter') el('#tnsave').click();
+      if (e.key === 'Escape') stop();
+    });
+  };
+
   el('#dl').onclick = () => itinerary(t);
   el('#print').onclick = () => window.print();
   document.querySelectorAll('.seg button').forEach(b => b.onclick = () => {
@@ -1238,7 +1280,7 @@ if (D) render();
 // page before the network is consulted at all.
 // ---------------------------------------------------------------------------
 
-const CFG = {"owner":"adeshag17","repo":"vietnam-flights","ref":"master","workflow":"sync-mail.yml","payload":"data/trips-payload.json","shell":"10"};
+const CFG = {"owner":"adeshag17","repo":"vietnam-flights","ref":"master","workflow":"sync-mail.yml","payload":"data/trips-payload.json","shell":"12"};
 
 const K = {token: 'ft.token', data: 'ft.payload', at: 'ft.payload.at'};
 
@@ -1669,6 +1711,27 @@ async function appendEdit(entry) {
 }
 
 window.__editHook = openEditor;
+
+// Renaming a trip from the phone. Shown immediately so it does not feel
+// like nothing happened, then written to the repository and applied by the
+// sync that follows - the grouping that produces the key runs in Python.
+window.__renameHook = async (raw, name) => {
+  try {
+    await appendEdit({
+      id: (crypto.randomUUID ? crypto.randomUUID()
+                             : String(Date.now()) + Math.random()),
+      at: new Date().toISOString(),
+      from: 'app', kind: 'trip-name', raw: raw, name: name,
+    });
+  } catch (e) {
+    alert(message(e) + '. Contents: write is needed on the token to rename.');
+    return;
+  }
+  const t = (D.trips || []).find(x => x.raw_name === raw);
+  if (t) { t.name = name; window.__boot(D); }
+  status('Renamed — applying…');
+  refresh();
+};
 
 // ---------------------------------------------------------------------------
 // Replacing itself.
