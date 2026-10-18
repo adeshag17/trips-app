@@ -1347,7 +1347,7 @@ if (D) render();
 // page before the network is consulted at all.
 // ---------------------------------------------------------------------------
 
-const CFG = {"owner":"adeshag17","repo":"vietnam-flights","ref":"master","workflow":"sync-mail.yml","payload":"data/trips-payload.json","review":"data/review-payload.json","shell":"17"};
+const CFG = {"owner":"adeshag17","repo":"vietnam-flights","ref":"master","workflow":"sync-mail.yml","payload":"data/trips-payload.json","review":"data/review-payload.json","shell":"18"};
 
 const K = {token: 'ft.token', data: 'ft.payload', at: 'ft.payload.at',
            etag: 'ft.payload.etag'};
@@ -1714,6 +1714,17 @@ function openEditor(vendor, id) {
       ${field('Arrival terminal', `arr_terminal.${i}`, s.arr_terminal)}
     </fieldset>`).join('');
 
+  // Which trip it is in now, and every trip it could move to. Grouping is by
+  // dates, which is usually right and sometimes chains separate journeys
+  // into one; naming a booking's trip here is how that gets corrected.
+  const current = (D.trips || []).find(t => (t.bookings || []).some(
+    x => x.vendor === vendor && x.booking_id === id));
+  // Shown by display name, chosen by the generated one: that is what the
+  // grouping keys on, and a display name can be anything someone typed.
+  const tripOptions = (D.trips || []).map(t =>
+    `<option value="${esc(t.raw_name)}" ${t === current ? 'selected' : ''}
+      >${esc(t.name)}</option>`).join('');
+
   const host = document.getElementById('appedit');
   host.hidden = false;
   host.innerHTML = `
@@ -1723,6 +1734,12 @@ function openEditor(vendor, id) {
         <button class="x" id="ed-close" title="Close">&times;</button>
       </div>
       <form id="ed-form">
+        <label class="fld"><span>Trip</span>
+          <select name="trip" id="ed-trip">${tripOptions}
+            <option value="__new__">New trip…</option></select></label>
+        <label class="fld" id="ed-newtrip" hidden><span>New trip's name</span>
+          <input name="newtrip" placeholder="Delhi, Nov 2026"
+                 autocomplete="off"></label>
         ${field('Reference', 'pnrs', (b.pnrs || []).join(', '))}
         ${field('Paid', 'paid', b.paid, {attrs: 'inputmode="decimal"'})}
         ${field('Currency', 'currency', b.currency)}
@@ -1740,6 +1757,11 @@ function openEditor(vendor, id) {
   const close = () => { host.hidden = true; host.innerHTML = ''; };
   document.getElementById('ed-close').onclick = close;
   document.getElementById('ed-cancel').onclick = close;
+  document.getElementById('ed-trip').onchange = e => {
+    const fresh = e.target.value === '__new__';
+    document.getElementById('ed-newtrip').hidden = !fresh;
+    if (fresh) document.querySelector('[name="newtrip"]').focus();
+  };
 
   document.getElementById('ed-form').onsubmit = async ev => {
     ev.preventDefault();
@@ -1756,6 +1778,9 @@ function openEditor(vendor, id) {
       if (!isNaN(n)) fields.paid = n;
     }
     if (val('currency') !== b.currency) fields.currency = val('currency');
+    const trip = val('trip') === '__new__' ? (val('newtrip') || '').trim()
+                                            : val('trip');
+    if (trip && (!current || trip !== current.raw_name)) fields.pinned_trip = trip;
 
     const segments = {};
     (b.segments || []).forEach((s, i) => {
