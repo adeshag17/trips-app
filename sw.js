@@ -2,8 +2,9 @@
 // Cache the shell, never the data. The payload is one fetch away and lives in
 // localStorage; caching API responses here would mean two stale copies to
 // reason about instead of one.
-const SHELL = 'trips-shell-13';
-const FILES = ['./', './index.html', './manifest.webmanifest', './icon.svg'];
+const SHELL = 'trips-shell-14';
+const FILES = ['./', './index.html', './manifest.webmanifest',
+               './icon-192.png', './icon-512.png'];
 
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(SHELL).then(c => c.addAll(FILES))
