@@ -10,7 +10,7 @@ jobs:
   check:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Look for anything that should not be public
         run: |
           if grep -rlE '"(pnrs|passengers|booking_id)"|__TRIPS__ =' \
