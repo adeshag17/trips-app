@@ -350,10 +350,15 @@ footer{color:var(--dim);font-size:12px;margin-top:26px;line-height:1.6}
 #appedit .sheethead b{flex:1;font-size:16px}
 #appedit .x{background:none;border:none;color:var(--dim);font-size:24px;
   line-height:1;cursor:pointer;padding:0 4px}
+/* Anything marked hidden stays hidden, whatever else styles it. A display
+   rule beats the attribute, and this trap has now been met three times -
+   the last because two rules of equal weight left the later one winning.
+   !important is the honest statement of intent here. */
+[hidden]{display:none !important}
 #appedit .fld{display:block;margin-bottom:10px}
 #appedit .fld span{display:block;font-size:11px;letter-spacing:.04em;
   text-transform:uppercase;color:var(--dim);margin-bottom:4px}
-#appedit input{width:100%;box-sizing:border-box;font:inherit;padding:9px 11px;
+#appedit input,#appedit select{width:100%;box-sizing:border-box;font:inherit;padding:9px 11px;
   border-radius:8px;border:1px solid var(--line);background:#0f1422;
   color:inherit}
 #appedit fieldset.seg{border:1px solid var(--line);border-radius:10px;
@@ -1347,7 +1352,7 @@ if (D) render();
 // page before the network is consulted at all.
 // ---------------------------------------------------------------------------
 
-const CFG = {"owner":"adeshag17","repo":"vietnam-flights","ref":"master","workflow":"sync-mail.yml","payload":"data/trips-payload.json","review":"data/review-payload.json","shell":"18"};
+const CFG = {"owner":"adeshag17","repo":"vietnam-flights","ref":"master","workflow":"sync-mail.yml","payload":"data/trips-payload.json","review":"data/review-payload.json","shell":"19"};
 
 const K = {token: 'ft.token', data: 'ft.payload', at: 'ft.payload.at',
            etag: 'ft.payload.etag'};
