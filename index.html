@@ -1352,7 +1352,7 @@ if (D) render();
 // page before the network is consulted at all.
 // ---------------------------------------------------------------------------
 
-const CFG = {"owner":"adeshag17","repo":"vietnam-flights","ref":"master","workflow":"sync-mail.yml","payload":"data/trips-payload.json","review":"data/review-payload.json","shell":"19"};
+const CFG = {"owner":"adeshag17","repo":"vietnam-flights","ref":"master","workflow":"sync-mail.yml","payload":"data/trips-payload.json","review":"data/review-payload.json","shell":"20"};
 
 const K = {token: 'ft.token', data: 'ft.payload', at: 'ft.payload.at',
            etag: 'ft.payload.etag'};
@@ -1516,7 +1516,8 @@ async function refresh() {
     try {
       const r = await api(`/repos/${CFG.owner}/${CFG.repo}/actions/workflows/`
                           + `${CFG.workflow}/runs?event=workflow_dispatch`
-                          + `&per_page=5`);
+                          + `&per_page=5&t=${Date.now()}`,
+                          {cache: 'no-store'});   // a cached list hides the run
       const runs = (await r.json()).workflow_runs || [];
       run = runs.find(x => new Date(x.created_at).getTime() >= since);
     } catch (e) { continue; }
@@ -1818,7 +1819,7 @@ function openEditor(vendor, id) {
     } catch (e) {
       btn.disabled = false;
       btn.textContent = 'Save';
-      alert(message(e) + '. Contents: write is needed on the token to edit.');
+      alert(writeError(e, 'edit'));
       return;
     }
     close();
@@ -1848,28 +1849,53 @@ function appendEdit(entry) {
 }
 
 async function appendEditNow(entry) {
-  let sha, existing = '';
-  try {
-    const r = await api(`/repos/${CFG.owner}/${CFG.repo}/contents/${EDITS}`
-                        + `?ref=${CFG.ref}`);
-    const j = await r.json();
-    sha = j.sha;
-    existing = new TextDecoder().decode(
-      Uint8Array.from(atob(j.content.replace(/\n/g, '')), c => c.charCodeAt(0)));
-  } catch (e) {
-    if (e.message !== 'token-scope') throw e;   // 404: the first edit ever
-  }
+  // Read, append, write back with the version read. Two things change the
+  // file between those steps: the sync each save starts, which marks edits
+  // applied, and - worse - the browser, which GitHub allows to reuse a read
+  // for 60 seconds. A second change within a minute was written over a copy
+  // that was already out of date, and refused (409). So the read skips the
+  // cache, and a refusal is answered by reading again and retrying.
+  for (let attempt = 1; ; attempt++) {
+    let sha, existing = '';
+    try {
+      const r = await api(`/repos/${CFG.owner}/${CFG.repo}/contents/${EDITS}`
+                          + `?ref=${CFG.ref}&t=${Date.now()}`,
+                          {cache: 'no-store'});
+      const j = await r.json();
+      sha = j.sha;
+      existing = new TextDecoder().decode(
+        Uint8Array.from(atob(j.content.replace(/\n/g, '')), c => c.charCodeAt(0)));
+    } catch (e) {
+      if (e.message !== 'token-scope') throw e;   // 404: the first edit ever
+    }
 
-  const body = {
-    message: entry.kind
-      ? `${entry.kind} from the app: ${entry.id || entry.raw || ''}`
-      : `Edit ${entry.vendor} ${entry.booking_id} from the app`,
-    content: b64(existing + JSON.stringify(entry) + '\n'),
-    branch: CFG.ref,
-  };
-  if (sha) body.sha = sha;
-  await api(`/repos/${CFG.owner}/${CFG.repo}/contents/${EDITS}`,
-            {method: 'PUT', body: JSON.stringify(body)});
+    const body = {
+      message: entry.kind
+        ? `${entry.kind} from the app: ${entry.id || entry.raw || ''}`
+        : `Edit ${entry.vendor} ${entry.booking_id} from the app`,
+      content: b64(existing + JSON.stringify(entry) + '\n'),
+      branch: CFG.ref,
+    };
+    if (sha) body.sha = sha;
+    try {
+      await api(`/repos/${CFG.owner}/${CFG.repo}/contents/${EDITS}`,
+                {method: 'PUT', body: JSON.stringify(body)});
+      return;
+    } catch (e) {
+      if (e.status !== 409 || attempt >= 4) throw e;
+      await new Promise(r => setTimeout(r, 800 * attempt));
+    }
+  }
+}
+
+// The token's permissions are only worth mentioning when the token was the
+// problem. A conflict or a lost connection is not that, and blaming the
+// token sent the reader looking in the wrong place.
+function writeError(e, doing) {
+  const hint = (e && [401, 403, 404].includes(e.status))
+    ? `. Contents: write is needed on the token to ${doing}.`
+    : '. Nothing was saved - try again.';
+  return message(e) + hint;
 }
 
 window.__editHook = openEditor;
@@ -1886,7 +1912,7 @@ window.__renameHook = async (raw, name) => {
       from: 'app', kind: 'trip-name', raw: raw, name: name,
     });
   } catch (e) {
-    alert(message(e) + '. Contents: write is needed on the token to rename.');
+    alert(writeError(e, 'rename'));
     return;
   }
   const t = (D.trips || []).find(x => x.raw_name === raw);
@@ -2091,7 +2117,7 @@ window.__reviewWrite = async (action, payload) => {
     });
   } catch (e) {
     return {ok: false,
-            error: message(e) + '. Contents: write is needed on the token.'};
+            error: writeError(e, 'confirm tickets')};
   }
   LS.set('ft.review.acted', JSON.stringify([...actedOn(), payload.id]));
   reviewActions++;
