@@ -304,6 +304,10 @@ footer{color:var(--dim);font-size:12px;margin-top:26px;line-height:1.6}
 #drawer .x{position:absolute;top:14px;right:16px;cursor:pointer;
   color:var(--dim);font-size:20px;line-height:1}
 
+.flightcell{display:flex;gap:8px;align-items:flex-start}
+.flightcell .logo{flex:none;width:24px;height:24px;border-radius:5px;
+  background:#fff;object-fit:contain;margin-top:1px}
+
 .appbar{position:sticky;top:0;z-index:40;display:flex;align-items:center;
   gap:10px;padding:8px 14px;background:var(--bg);border-bottom:1px solid
   var(--line);font-size:13px;color:var(--dim)}
@@ -917,6 +921,17 @@ function placeLink(code, term, kind, row){
 /* The document itself if we have it on disk and are being served, and the
    Drive copy otherwise -- which needs the right Google account, so the
    link says so rather than leaving you staring at a permission error. */
+/* The airline's logo, from the copies shipped with the page - so it shows
+   offline and asks nothing of a third party. Only for carriers we have one
+   for; Go First and Vistara no longer exist and nobody publishes theirs. */
+function logo(r){
+  const code = (r.flight_no || '').replace(/[^A-Z0-9]/gi, '').slice(0, 2).toUpperCase();
+  if (r.kind !== 'flight' || !(D.logos || []).includes(code)) return '';
+  return `<img class="logo" src="${esc(D.logo_base || '')}${code}.png"
+    alt="" width="24" height="24" loading="lazy"
+    onerror="this.remove()">`;
+}
+
 function docLinks(r){
   const out = [];
   (r.files || []).forEach(f => {
@@ -998,8 +1013,13 @@ function theTable(t){
           + (r.arrive ? `<div class="dim">→ ${dt(r.arrive)}</div>` : '')
           + (r.duration_min ? `<div class="dim">${fmtMin(r.duration_min)}</div>` : '')
         : '<span class="dim">--</span>';
-    const cost = r.paid_inr
+    // The second journey of a return ticket: its fare is on the first, which
+    // is the one purchase the airline made of it.
+    const cost = r.part > 1
+      ? '<span class="dim">return —<br>paid with outbound</span>'
+      : r.paid_inr
       ? money(r.paid_inr, 'INR')
+        + (r.parts > 1 ? '<div class="dim">return ticket</div>' : '')
         + (r.estimate ? '<div class="dim">estimate</div>'
            : r.currency !== 'INR' ? `<div class="dim">${money(r.paid, r.currency)}</div>` : '')
       : '<span class="dim">--</span>';
@@ -1009,14 +1029,14 @@ function theTable(t){
         ${r.kind === 'hotel' && r.address
           ? `<div class="dim">${esc(r.address)}</div>` : ''}</td>
       ${r.kind === 'hotel' ? '' : `<td>${esc((r.who || []).map(firstName).join(', '))}</td>`}
-      <td>${r.checkin && r.pnr
+      <td><div class="flightcell">${logo(r)}<div>${r.checkin && r.pnr
           ? `<a href="#" class="ci" data-url="${esc(r.checkin)}"
                data-pnr="${esc(r.pnr)}"
                title="Copy ${esc(r.pnr)} and open web check-in"
                >${esc(r.airline)}</a>`
           : esc(r.airline)}
         ${r.flight_no ? `<div class="mono dim">${esc(r.flight_no)}</div>` : ''}
-        ${r.stops ? `<div class="dim">${r.stops} stop</div>` : ''}</td>
+        ${r.stops ? `<div class="dim">${r.stops} stop</div>` : ''}</div></div></td>
       <td>${rules(r)}</td>
       <td>${r.pnr ? `<code class="mono">${esc(r.pnr)}</code>` : '<span class="dim">--</span>'}
         <div class="dim">${esc(r.vendor)}</div></td>
@@ -1297,7 +1317,7 @@ if (D) render();
 // page before the network is consulted at all.
 // ---------------------------------------------------------------------------
 
-const CFG = {"owner":"adeshag17","repo":"vietnam-flights","ref":"master","workflow":"sync-mail.yml","payload":"data/trips-payload.json","review":"data/review-payload.json","shell":"15"};
+const CFG = {"owner":"adeshag17","repo":"vietnam-flights","ref":"master","workflow":"sync-mail.yml","payload":"data/trips-payload.json","review":"data/review-payload.json","shell":"16"};
 
 const K = {token: 'ft.token', data: 'ft.payload', at: 'ft.payload.at',
            etag: 'ft.payload.etag'};
@@ -1386,6 +1406,7 @@ async function api(path, init) {
 // work". Nothing is on this phone's disk.
 function boot(data) {
   data.served = false;
+  data.logo_base = 'logos/';          // published beside the page
   window.__boot(data);
   show('trips');
 }
