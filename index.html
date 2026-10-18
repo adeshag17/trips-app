@@ -374,21 +374,51 @@ footer{color:var(--dim);font-size:12px;margin-top:26px;line-height:1.6}
 #appedit button.ghost{font:inherit;padding:10px 16px;border-radius:9px;
   cursor:pointer;background:none;color:var(--dim);border:1px solid var(--line)}
 
-/* The review sheet. [hidden] first: a display rule beats the attribute,
-   and an overlay that ignores hidden covers the app - it has happened. */
-#reviewsheet[hidden]{display:none}
-#reviewsheet{position:fixed;inset:0;z-index:65;background:var(--bg);
-  display:flex;flex-direction:column}
-#reviewsheet .rhead{display:flex;align-items:center;gap:10px;padding:10px 14px;
+/* Tabs. [hidden] stated outright on everything here: a display rule beats
+   the attribute, and an element that ignores hidden has covered this app
+   before. */
+.tabs[hidden],#reviewview[hidden],.badge[hidden]{display:none}
+.tabs{display:flex;gap:4px;background:var(--bg);border-top:1px solid var(--line);
+  position:fixed;left:0;right:0;bottom:0;z-index:45;
+  padding:6px 8px calc(6px + env(safe-area-inset-bottom))}
+.tabs a{flex:1;text-align:center;padding:9px 6px;border-radius:9px;
+  color:var(--dim);text-decoration:none;font-size:14px;font-weight:600}
+.tabs a.on{background:#1b2a47;color:#cfe3ff}
+.badge{display:inline-block;min-width:18px;padding:0 6px;margin-left:4px;
+  border-radius:99px;background:#2f4a22;color:#d6f5c6;font-size:12px;
+  line-height:18px}
+/* Room for the bar under the content it would otherwise sit on. */
+.wrap{padding-bottom:84px}
+@media (min-width:900px){
+  .tabs{position:sticky;top:42px;bottom:auto;border-top:0;
+    border-bottom:1px solid var(--line);justify-content:flex-start}
+  .tabs a{flex:none;padding:7px 18px}
+  .wrap{padding-bottom:60px}
+}
+
+/* The Review tab: the desk's own cards in a frame, filling what the bars
+   leave. */
+#reviewview{display:flex;flex-direction:column;
+  height:calc(100dvh - 42px - 62px)}
+#reviewview .rhead{display:flex;align-items:center;gap:10px;padding:10px 14px;
   border-bottom:1px solid var(--line)}
-#reviewsheet .rnote{flex:1;font-size:12px;color:var(--dim)}
-#reviewsheet iframe{flex:1;width:100%;border:0}
+#reviewview .rnote{flex:1;font-size:12px;color:var(--dim)}
+#reviewview a.refresh{text-decoration:none}
+#reviewview iframe{flex:1;width:100%;border:0}
+#reviewview .rempty{max-width:520px;margin:40px auto;padding:0 20px;
+  color:var(--dim);line-height:1.6}
+#reviewview .rempty h2{color:inherit;font-size:18px}
+@media (min-width:900px){ #reviewview{height:calc(100dvh - 42px - 46px)} }
 </style>
 </head><body>
 <div id="appbar" class="appbar"><span class="as">Starting…</span></div>
 <div id="shell"><div id="shellmsg"><h2>Starting…</h2></div></div>
 <div id="appedit" hidden></div>
-<div id="reviewsheet" hidden></div>
+<nav id="tabs" class="tabs" hidden>
+  <a href="#trips" data-tab="trips">Trips</a>
+  <a href="#review" data-tab="review">Review <span id="rbadge" class="badge" hidden></span></a>
+</nav>
+<div id="reviewview" hidden></div>
 <noscript><p style="padding:24px">This app needs JavaScript: it fetches your
 bookings from a private repository in the browser.</p></noscript>
 <div class="wrap" hidden>
@@ -1317,7 +1347,7 @@ if (D) render();
 // page before the network is consulted at all.
 // ---------------------------------------------------------------------------
 
-const CFG = {"owner":"adeshag17","repo":"vietnam-flights","ref":"master","workflow":"sync-mail.yml","payload":"data/trips-payload.json","review":"data/review-payload.json","shell":"16"};
+const CFG = {"owner":"adeshag17","repo":"vietnam-flights","ref":"master","workflow":"sync-mail.yml","payload":"data/trips-payload.json","review":"data/review-payload.json","shell":"17"};
 
 const K = {token: 'ft.token', data: 'ft.payload', at: 'ft.payload.at',
            etag: 'ft.payload.etag'};
@@ -1334,12 +1364,20 @@ const bar  = () => document.getElementById('appbar');
 const page = () => document.querySelector('.wrap');
 const sh   = s => document.getElementById('shellmsg').innerHTML = s;
 
-// The page is one of two things at a time: a message, or the trips view.
-// Showing an empty trips scaffold under a "connect this device" card is how
-// it looked before this existed, and it looked broken.
+// The page is one of two things at a time: a message, or the app. Showing an
+// empty trips scaffold under a "connect this device" card is how it looked
+// before this existed, and it looked broken.
+//
+// Inside the app, the tab is part of the address (#review), so the phone's
+// back button and a reload both land where you were.
+function tab() { return location.hash === '#review' ? 'review' : 'trips'; }
+
 function show(what) {
-  document.getElementById('shell').hidden = what !== 'shell';
-  page().hidden = what !== 'trips';
+  const app = what !== 'shell';
+  document.getElementById('shell').hidden = app;
+  document.getElementById('tabs').hidden = !app;
+  page().hidden = !app || tab() !== 'trips';
+  document.getElementById('reviewview').hidden = !app || tab() !== 'review';
 }
 
 function token()        { return LS.get(K.token) || ''; }
@@ -1359,14 +1397,12 @@ function ago(iso) {
 function status(text, kind) {
   const b = bar();
   if (!b) return;
-  status.last = [text, kind];             // so the review count can redraw it
-  const waiting = reviewWaiting().length;
+  status.last = [text, kind];
+  paintTabs();                            // the Review count lives on its tab
   b.className = 'appbar ' + (kind || '');
   b.innerHTML =
     `<span class="as">${text}</span>` +
     `<span class="ver" title="Which copy of the app this is">v${CFG.shell}</span>` +
-    (waiting ? `<button id="reviewbtn" class="refresh update"
-       title="Confirm what the mailbox found">Review (${waiting})</button>` : '') +
     `<button id="refresh" class="refresh">Check mail</button>` +
     // Named, not a "⋯". A token expires or gets replaced, and the way to
     // paste a new one should not be something you have to guess at.
@@ -1374,8 +1410,6 @@ function status(text, kind) {
        title="Paste a different token">token</button>`;
   document.getElementById('refresh').onclick = refresh;
   document.getElementById('settings').onclick = () => askForToken('');
-  const rb = document.getElementById('reviewbtn');
-  if (rb) rb.onclick = openReview;
 }
 
 async function api(path, init) {
@@ -1934,23 +1968,63 @@ async function fetchReview() {
 async function loadReview(pop) {
   if (!token()) return;
   REVIEW = await fetchReview();
-  if (status.last) status(...status.last);   // redraw with the count
-  if (pop && reviewWaiting().length) openReview();
+  paintTabs();
+  // After Check mail, anything waiting is the next thing to do: go there.
+  if (pop && reviewWaiting().length && tab() !== 'review')
+    location.hash = '#review';
+  else if (tab() === 'review') openReview();
 }
 
 let reviewActions = 0;
 
+// The tab bar: which is open, and how many cards are waiting.
+function paintTabs() {
+  const nav = document.getElementById('tabs');
+  if (!nav) return;
+  nav.querySelectorAll('[data-tab]').forEach(a =>
+    a.classList.toggle('on', a.dataset.tab === tab()));
+  const n = reviewWaiting().length;
+  const badge = document.getElementById('rbadge');
+  badge.textContent = n || '';
+  badge.hidden = !n;
+}
+
+// Moving between tabs. Leaving Review with cards confirmed or dropped is
+// "done": one sync applies them all, as the Done button always did.
+let lastTab = tab();
+function route() {
+  const now = tab();
+  if (lastTab === 'review' && now !== 'review' && reviewActions) applyReview();
+  lastTab = now;
+  if (!document.getElementById('shell').hidden) return;   // not connected yet
+  show('app');
+  paintTabs();
+  if (now === 'review') openReview();
+}
+addEventListener('hashchange', route);
+
+function applyReview() {
+  status(`${reviewActions} saved — applying…`);
+  reviewActions = 0;
+  refresh();                       // one sync applies every confirm and drop
+}
+
 function openReview() {
   const items = reviewWaiting();
-  if (!items.length) return;
-  const host = document.getElementById('reviewsheet');
-  host.hidden = false;
-  reviewActions = 0;
+  const host = document.getElementById('reviewview');
+  if (!items.length) {
+    host.innerHTML = `<div class="rempty">
+      <h2>Nothing to review</h2>
+      <p>New confirmations from the mailbox land here. <b>Check mail</b>
+      looks for them now; the cloud also checks twice a day on its own.</p>
+      ${reviewActions ? `<p><a href="#trips">Back to trips</a> to apply what
+      you just confirmed.</p>` : ''}</div>`;
+    return;
+  }
   host.innerHTML = `
     <div class="rhead">
-      <b>Review</b>
       <span class="rnote">${items.length} waiting — confirm or drop each</span>
-      <button id="rclose" class="refresh">Done</button>
+      <a href="#trips" id="rclose" class="refresh">Done</a>
     </div>
     <iframe id="rframe" title="Review"></iframe>`;
   // The cards see only what has not been acted on yet.
@@ -1973,7 +2047,6 @@ window.__reviewApi = (action, payload) => parent.__reviewWrite(action, payload);
 <\/script>
 <script src="review.js"><\/script>
 </body></html>`;
-  document.getElementById('rclose').onclick = closeReview;
 }
 
 window.__reviewWrite = async (action, payload) => {
@@ -1992,23 +2065,12 @@ window.__reviewWrite = async (action, payload) => {
   }
   LS.set('ft.review.acted', JSON.stringify([...actedOn(), payload.id]));
   reviewActions++;
+  paintTabs();
   return {ok: true};
 };
 
-function closeReview() {
-  const host = document.getElementById('reviewsheet');
-  host.hidden = true;
-  host.innerHTML = '';
-  if (reviewActions) {
-    status(`${reviewActions} saved — applying…`);
-    refresh();                     // one sync applies every confirm and drop
-  } else if (status.last) {
-    status(...status.last);
-  }
-}
-
-// Open the app: show the count, but do not pop anything over the trips.
-// Only Check mail opens the sheet by itself.
+// Open the app on whichever tab the address names, with the Review count on
+// its tab. Only Check mail moves you to Review by itself.
 start().then(() => loadReview(false));
 checkForUpdate();
 </script>
