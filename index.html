@@ -441,8 +441,41 @@ footer{color:var(--dim);font-size:12px;margin-top:26px;line-height:1.6}
    screen; reached on a phone by address, it explains instead. */
 .tabs a.wideonly{display:none}
 @media (min-width:900px){ .tabs a.wideonly{display:block} }
-#planview{height:calc(100dvh - 42px - 46px)}
-#planview iframe{width:100%;height:100%;border:0;display:block}
+#planview{min-height:calc(100dvh - 42px - 46px);display:flex;flex-direction:column}
+#planview iframe{width:100%;flex:1;min-height:calc(100dvh - 130px);border:0;display:block}
+.boardbar{display:flex;gap:14px;align-items:center;padding:8px 16px;
+  border-bottom:1px solid var(--line);font-size:13px}
+.boardbar a{color:var(--accent)}
+
+/* The plan editor. */
+.planed{max-width:1000px;margin:0 auto;padding:18px 20px 80px;width:100%}
+.planed .pbar{display:flex;gap:8px;align-items:center;margin-bottom:14px}
+.planed .pbar select{font:inherit;padding:7px 10px;border-radius:8px;min-width:260px;
+  border:1px solid var(--line);background:#0f1422;color:inherit}
+.planed .sp{flex:1}
+.planed .ghostbtn{background:none;border:1px solid var(--line);color:var(--dim);
+  text-decoration:none;padding:5px 11px;border-radius:7px;font:inherit;cursor:pointer}
+.planed .ghostbtn:disabled{opacity:.5;cursor:default}
+.planed .pname{display:block;max-width:420px}
+.planed .pname span,.planed h3 small{font-size:11px;color:var(--dim)}
+.planed .pname span{display:block;text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px}
+.planed h3{font-size:15px;margin:22px 0 8px}
+.planed h3 small{font-weight:400;margin-left:8px}
+.planed input{font:inherit;padding:6px 8px;border-radius:7px;border:1px solid var(--line);
+  background:#0f1422;color:inherit;width:100%;box-sizing:border-box}
+.planed input.code{text-transform:uppercase;width:70px}
+.planed input[type=number]{width:70px}
+.planed input[type=checkbox]{width:auto;padding:0}
+.pedit{border-collapse:collapse;width:100%}
+.pedit th{text-align:left;font-size:11px;color:var(--dim);font-weight:500;padding:4px 6px}
+.pedit td{padding:4px 6px;vertical-align:middle}
+.pedit td.who{display:flex;flex-wrap:wrap;gap:6px}
+.chip{display:inline-flex;gap:5px;align-items:center;font-size:12.5px;
+  border:1px solid var(--line);border-radius:99px;padding:3px 9px;cursor:pointer}
+.linkbtn{background:none;border:none;color:var(--accent);cursor:pointer;font:inherit;padding:4px 0}
+.pedit .linkbtn{color:var(--dim)}
+.pfoot{display:flex;gap:10px;align-items:center;margin-top:24px}
+.planed .small{font-size:12px;margin-top:8px}
 </style>
 </head><body>
 <div id="appbar" class="appbar"><span class="as">Starting…</span></div>
@@ -1385,7 +1418,7 @@ if (D) render();
 // page before the network is consulted at all.
 // ---------------------------------------------------------------------------
 
-const CFG = {"owner":"adeshag17","repo":"vietnam-flights","ref":"master","workflow":"sync-mail.yml","payload":"data/trips-payload.json","review":"data/review-payload.json","prices":"data/prices-payload.json","pool":"data/flights.json","bundles":"data/bundles.json","shell":"22"};
+const CFG = {"owner":"adeshag17","repo":"vietnam-flights","ref":"master","workflow":"sync-mail.yml","payload":"data/trips-payload.json","review":"data/review-payload.json","prices":"data/prices-payload.json","pool":"data/flights.json","bundles":"data/bundles.json","shell":"23"};
 
 const K = {token: 'ft.token', data: 'ft.payload', at: 'ft.payload.at',
            etag: 'ft.payload.etag'};
@@ -2228,15 +2261,26 @@ function sparkline(series) {
   </svg>`;
 }
 
+// One section per plan. A payload from before plans were data had one trip
+// at the top level; it is read as a plan of one.
 function renderPrices(p) {
-  if (!p || !p.legs) {
+  const sections = p && (p.plans || (p.legs ? [{name: p.trip, legs: p.legs,
+                                                 total_now: p.total_now}] : null));
+  if (!sections) {
     return `<div class="pempty"><h2>No prices yet</h2>
       <p>The cloud prices what is still to book twice a day. Nothing has been
       written yet.</p></div>`;
   }
+  const body = sections.map(renderPlanPrices).join('');
+  return `<div class="pwrap">
+    <p class="dim">At today's lowest fares for each open leg, checked twice a
+    day. Fares are what Google Flights advertised, not quotes.</p>
+    ${body}</div>`;
+}
+
+function renderPlanPrices(p) {
   if (!p.legs.length) {
-    return `<div class="pempty"><h2>Everything is booked</h2>
-      <p>${esc(p.trip)} has no open legs left to price.</p></div>`;
+    return `<h2>${esc(p.name)} <small>everything is booked</small></h2>`;
   }
   const cards = p.legs.map(l => {
     if (!l.now_pp) {
@@ -2265,11 +2309,8 @@ function renderPrices(p) {
       <table class="popts"><tbody>${opts}</tbody></table>
     </div>`;
   }).join('');
-  return `<div class="pwrap">
-    <h2>${rupees(p.total_now)} <small>to finish booking ${esc(p.trip)}</small></h2>
-    <p class="dim">At today's lowest fares for each open leg, checked twice a
-    day. Fares are what Google Flights advertised, not quotes.</p>
-    ${cards}</div>`;
+  return `<h2>${rupees(p.total_now)} <small>to finish booking ${esc(p.name)}</small></h2>
+    ${cards}`;
 }
 
 // ---------------------------------------------------------------------------
@@ -2286,17 +2327,12 @@ function renderPrices(p) {
 const WIDE = '(min-width: 900px)';
 let PLAN = null;
 
-async function openPlan(force) {
+// The Vietnam board - the old planner - opened from the plan editor. It is
+// kept until the new planner can pick flights and compare bundles itself.
+async function openBoard(force) {
   const host = document.getElementById('planview');
-  if (!matchMedia(WIDE).matches) {
-    host.innerHTML = `<div class="pempty"><h2>Plan is for a bigger screen</h2>
-      <p>The planner is a drag-and-drop board built for a laptop. Open the
-      app on one and choose <b>Plan</b>. Prices for what is still to book
-      are on the <a href="#prices">Prices</a> tab.</p></div>`;
-    return;
-  }
-  // Leaving the tab and coming back keeps the board as it was.
-  if (PLAN && !force && host.querySelector('iframe')) return;
+  // Leaving and coming back keeps the board as it was.
+  if (PLAN && !force && host.querySelector('#pframe')) return;
   host.innerHTML = '<div class="pempty">Loading the fare pool…</div>';
   const [dump, bundles] = await Promise.all([
     fetchData(CFG.pool, 'ft.pool'), fetchData(CFG.bundles, 'ft.bundles')]);
@@ -2307,7 +2343,11 @@ async function openPlan(force) {
     return;
   }
   PLAN = {dump, bundles};
-  host.innerHTML = '<iframe id="pframe" title="Plan" src="plan.html"></iframe>';
+  host.innerHTML = `<div class="boardbar"><a href="#plan" id="toplans">← Plans</a>
+    <span class="dim">The Vietnam board: pick flights and compare bundles.</span></div>
+    <iframe id="pframe" title="Vietnam board" src="plan.html"></iframe>`;
+  document.getElementById('toplans').onclick = e => {
+    e.preventDefault(); openPlan(); };
 }
 
 window.__planDump = () => PLAN.dump;
@@ -2360,7 +2400,7 @@ window.__planWrite = async (action, body) => {
       return {ok: true, stale: []};
     }
     if (action === 'sync') {
-      openPlan(true);                 // fetch both again, and reload the board
+      openBoard(true);                // fetch both again, and reload the board
       return {ok: true, stale: []};
     }
     return {ok: false, output: 'not available in the app'};
@@ -2371,13 +2411,316 @@ window.__planWrite = async (action, body) => {
 
 // Open the app on whichever tab the address names, with the Review count on
 // its tab. Only Check mail moves you to Review by itself.
-start().then(() => {
-  loadReview(false);
-  // Arriving on a tab's address - a link, a bookmark, a reload - showed its
-  // panel but never filled it: tabs were only loaded on switching to them.
-  if (tab() === 'prices') openPrices();
-  if (tab() === 'plan') openPlan();
-});
+// Started once every script on the page has run. The plan editor is a
+// script of its own after this one, and when the data was cached the start
+// finished before that script had even been read: "openPlan is not
+// defined", and a blank Plan tab.
+function begin() {
+  start().then(() => {
+    loadReview(false);
+    // Arriving on a tab's address - a link, a bookmark, a reload - showed
+    // its panel but never filled it: tabs were only loaded on switching.
+    if (tab() === 'prices') openPrices();
+    if (tab() === 'plan') openPlan();
+  });
+}
+if (document.readyState === 'loading') addEventListener('DOMContentLoaded', begin);
+else begin();
 checkForUpdate();
+</script>
+<script>// ---------------------------------------------------------------------------
+// The plan editor: which trips are being planned, who is travelling, and the
+// legs they need.
+//
+// A plan is a file in data/plans/ in the private repository (plans.py
+// describes it). This reads them, lets them be changed, and writes them
+// back; the cloud's price check then prices every open leg of every plan.
+// Nothing here knows about Vietnam.
+// ---------------------------------------------------------------------------
+
+let PLANS = null;          // [{plan, sha?}] as read from the repository
+let EDIT = null;           // the plan open in the editor, a working copy
+let EDIT_DIRTY = false;
+
+const PLANS_DIR = 'data/plans';
+
+async function loadPlans() {
+  const r = await api(`/repos/${CFG.owner}/${CFG.repo}/contents/${PLANS_DIR}`
+                      + `?ref=${CFG.ref}&t=${Date.now()}`, {cache: 'no-store'});
+  const files = (await r.json()).filter(f => f.name.endsWith('.json'));
+  const got = await Promise.all(files.map(f =>
+    fetchData(`${PLANS_DIR}/${f.name}`, `ft.plan.${f.name}`)));
+  return got.filter(Boolean).sort((a, b) =>
+    (firstDate(b) || '').localeCompare(firstDate(a) || ''));
+}
+
+function firstDate(p) {
+  return (p.legs || []).flatMap(l => l.dates || []).sort()[0] || '';
+}
+
+function slug(s) {
+  return (s || 'plan').toLowerCase().replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-|-$/g, '') || 'plan';
+}
+
+function blankPlan(name) {
+  return {id: '', name: name || 'New trip', trip_keys: [], currency: 'INR',
+          travellers: [], legs: []};
+}
+
+async function openPlan() {
+  const host = document.getElementById('planview');
+  if (!matchMedia(WIDE).matches) {
+    host.innerHTML = `<div class="pempty"><h2>Plan is for a bigger screen</h2>
+      <p>The planner is built for a laptop. Open the app on one and choose
+      <b>Plan</b>. Prices for what is still to book are on the
+      <a href="#prices">Prices</a> tab.</p></div>`;
+    return;
+  }
+  if (!PLANS) {
+    host.innerHTML = '<div class="pempty">Loading plans…</div>';
+    try { PLANS = await loadPlans(); }
+    catch (e) {
+      host.innerHTML = `<div class="pempty"><h2>Plans did not load</h2>
+        <p>${esc(message(e))}</p></div>`;
+      return;
+    }
+  }
+  if (!EDIT) EDIT = clone(PLANS[0] || blankPlan());
+  renderEditor();
+}
+
+const clone = o => JSON.parse(JSON.stringify(o));
+
+function renderEditor() {
+  const host = document.getElementById('planview');
+  const p = EDIT;
+  const options = PLANS.map(x => `<option value="${esc(x.id)}"
+      ${x.id === p.id ? 'selected' : ''}>${esc(x.name)}</option>`).join('')
+    + (p.id ? '' : `<option selected>${esc(p.name)} (not saved)</option>`);
+  const trav = p.travellers.map((t, i) => `<tr data-t="${i}">
+      <td><input data-f="label" value="${esc(t.label)}" placeholder="Adesh"></td>
+      <td><input data-f="adults" type="number" min="0" value="${t.adults}"></td>
+      <td><input data-f="children" type="number" min="0" value="${t.children}"></td>
+      <td><button class="linkbtn" data-deltrav="${i}" title="Remove">✕</button></td>
+    </tr>`).join('');
+  const legs = p.legs.map((l, i) => {
+    const d = (l.dates || []).slice().sort();
+    const who = p.travellers.map(t => `<label class="chip">
+        <input type="checkbox" data-who="${esc(t.key)}"
+          ${(l.who || []).includes(t.key) ? 'checked' : ''}> ${esc(t.label)}</label>`).join('');
+    return `<tr data-l="${i}">
+      <td><input data-f="from" value="${esc(l.from)}" maxlength="3"
+           list="airports" class="code" placeholder="SIN"></td>
+      <td><input data-f="to" value="${esc(l.to)}" maxlength="3"
+           list="airports" class="code" placeholder="BOM"></td>
+      <td><input data-f="first" type="date" value="${d[0] || ''}"></td>
+      <td><input data-f="last" type="date" value="${d[d.length - 1] || ''}"></td>
+      <td class="who">${who || '<span class="dim">add travellers first</span>'}</td>
+      <td><button class="linkbtn" data-delleg="${i}" title="Remove">✕</button></td>
+    </tr>`;
+  }).join('');
+  // D is the trips data, declared with let in trips.js: shared between
+  // scripts, but not a property of window.
+  const known = (typeof D !== 'undefined' && D && D.airports) || {};
+  const airports = Object.entries(known).map(([c, n]) =>
+    `<option value="${esc(c)}">${esc(n)}</option>`).join('');
+
+  host.innerHTML = `<div class="planed">
+    <div class="pbar">
+      <select id="pl-pick">${options}</select>
+      <button class="refresh" id="pl-new">+ New plan</button>
+      <button class="refresh ghostbtn" id="pl-copy" ${p.id ? '' : 'disabled'}>Copy</button>
+      <span class="sp"></span>
+      ${p.id === 'vietnam-dec-2026'
+        ? '<a href="#" id="pl-board" class="refresh ghostbtn">Open the Vietnam board</a>' : ''}
+    </div>
+    <label class="pname"><span>Name</span>
+      <input id="pl-name" value="${esc(p.name)}"></label>
+
+    <h3>Travellers <small>each traveller is booked as one ticket group</small></h3>
+    <table class="pedit"><thead><tr><th>Who</th><th>Adults</th><th>Children</th><th></th></tr></thead>
+      <tbody>${trav}</tbody></table>
+    <button class="linkbtn" id="pl-addtrav">+ Add traveller</button>
+
+    <h3>Legs <small>one row per flight needed; a range of dates means any of them</small></h3>
+    <table class="pedit"><thead><tr><th>From</th><th>To</th><th>Earliest</th>
+      <th>Latest</th><th>Who flies it</th><th></th></tr></thead>
+      <tbody>${legs}</tbody></table>
+    <button class="linkbtn" id="pl-addleg">+ Add leg</button>
+    <datalist id="airports">${airports}</datalist>
+
+    <div class="pfoot">
+      <span id="pl-msg" class="dim">${EDIT_DIRTY ? 'Unsaved changes.' : ''}</span>
+      <span class="sp"></span>
+      ${p.id ? '<button class="refresh ghostbtn" id="pl-del">Delete plan</button>' : ''}
+      <button class="refresh" id="pl-save">Save plan</button>
+    </div>
+    <p class="dim small">Saved to the private repository. The next price check
+    - twice a day - prices every open leg; a leg already booked is matched to
+    its ticket automatically.</p>
+  </div>`;
+  wireEditor();
+}
+
+// Read the form back into EDIT, so a re-render never loses typing.
+function collectEditor() {
+  const host = document.getElementById('planview');
+  const p = EDIT;
+  p.name = host.querySelector('#pl-name').value.trim() || p.name;
+  host.querySelectorAll('[data-t]').forEach(row => {
+    const t = p.travellers[+row.dataset.t];
+    const label = row.querySelector('[data-f=label]').value.trim();
+    t.label = label || t.label;
+    if (!t.key) t.key = slug(label);
+    t.adults = Math.max(0, parseInt(row.querySelector('[data-f=adults]').value, 10) || 0);
+    t.children = Math.max(0, parseInt(row.querySelector('[data-f=children]').value, 10) || 0);
+  });
+  host.querySelectorAll('[data-l]').forEach(row => {
+    const l = p.legs[+row.dataset.l];
+    l.from = row.querySelector('[data-f=from]').value.trim().toUpperCase();
+    l.to = row.querySelector('[data-f=to]').value.trim().toUpperCase();
+    const a = row.querySelector('[data-f=first]').value;
+    const z = row.querySelector('[data-f=last]').value || a;
+    l.dates = a ? dateRange(a, z < a ? a : z) : [];
+    l.who = [...row.querySelectorAll('[data-who]')].filter(c => c.checked)
+      .map(c => c.dataset.who);
+    if (!l.key || l.key.startsWith('new:'))
+      l.key = `${l.who.join('-') || 'leg'}:${l.from}-${l.to}`;
+  });
+}
+
+function dateRange(a, z) {
+  const out = [];
+  for (let d = new Date(a + 'T00:00:00Z'); d <= new Date(z + 'T00:00:00Z');
+       d.setUTCDate(d.getUTCDate() + 1))
+    out.push(d.toISOString().slice(0, 10));
+  return out.slice(0, 31);                 // a month is a lot of searches already
+}
+
+function problems(p) {
+  const out = [];
+  if (!p.name.trim()) out.push('the plan needs a name');
+  p.legs.forEach((l, i) => {
+    const n = `leg ${i + 1}`;
+    if (!/^[A-Z]{3}$/.test(l.from) || !/^[A-Z]{3}$/.test(l.to))
+      out.push(`${n}: airports are three-letter codes, like SIN`);
+    if (!l.dates.length) out.push(`${n}: needs a date`);
+    if (!l.who.length) out.push(`${n}: tick who flies it`);
+  });
+  const keys = p.travellers.map(t => t.key);
+  if (new Set(keys).size !== keys.length) out.push('two travellers have the same name');
+  return out;
+}
+
+function wireEditor() {
+  const host = document.getElementById('planview');
+  const $ = s => host.querySelector(s);
+  const dirty = () => { EDIT_DIRTY = true; $('#pl-msg').textContent = 'Unsaved changes.'; };
+  host.querySelectorAll('input').forEach(i => i.addEventListener('input', dirty));
+  host.querySelectorAll('input[type=checkbox]').forEach(i => i.addEventListener('change', dirty));
+  // A traveller's name is what the leg ticks show, so finishing one redraws.
+  host.querySelectorAll('[data-t] [data-f=label]').forEach(i =>
+    i.addEventListener('change', () => { collectEditor(); renderEditor(); }));
+
+  const leave = () => !EDIT_DIRTY || confirm('Discard unsaved changes to this plan?');
+  $('#pl-pick').onchange = e => {
+    if (!leave()) { e.target.value = EDIT.id; return; }
+    EDIT = clone(PLANS.find(x => x.id === e.target.value));
+    EDIT_DIRTY = false;
+    renderEditor();
+  };
+  $('#pl-new').onclick = () => {
+    if (!leave()) return;
+    // A fresh plan, its name ready to type over - no pop-up to answer first.
+    EDIT = blankPlan('New trip');
+    EDIT_DIRTY = true;
+    renderEditor();
+    const name = document.getElementById('pl-name');
+    name.focus(); name.select();
+  };
+  $('#pl-copy').onclick = () => {
+    collectEditor();
+    const copy = clone(EDIT);
+    copy.id = ''; copy.name = EDIT.name + ' (copy)'; copy.trip_keys = [];
+    EDIT = copy; EDIT_DIRTY = true;
+    renderEditor();
+  };
+  if ($('#pl-board')) $('#pl-board').onclick = e => { e.preventDefault(); openBoard(); };
+
+  $('#pl-addtrav').onclick = () => {
+    collectEditor();
+    EDIT.travellers.push({key: '', label: '', adults: 1, children: 0});
+    dirty(); renderEditor();
+    const rows = host.querySelectorAll('[data-t] [data-f=label]');
+    rows[rows.length - 1].focus();
+  };
+  host.querySelectorAll('[data-deltrav]').forEach(b => b.onclick = () => {
+    collectEditor();
+    const gone = EDIT.travellers.splice(+b.dataset.deltrav, 1)[0];
+    EDIT.legs.forEach(l => { l.who = l.who.filter(k => k !== gone.key); });
+    dirty(); renderEditor();
+  });
+  $('#pl-addleg').onclick = () => {
+    collectEditor();
+    const prev = EDIT.legs[EDIT.legs.length - 1];
+    // A new leg usually starts where the last one ended, with the same people.
+    EDIT.legs.push({key: 'new:' + Date.now(), from: prev ? prev.to : '', to: '',
+                    dates: [], who: prev ? prev.who.slice() : EDIT.travellers.map(t => t.key)});
+    dirty(); renderEditor();
+  };
+  host.querySelectorAll('[data-delleg]').forEach(b => b.onclick = () => {
+    collectEditor();
+    EDIT.legs.splice(+b.dataset.delleg, 1);
+    dirty(); renderEditor();
+  });
+
+  $('#pl-save').onclick = async () => {
+    collectEditor();
+    const bad = problems(EDIT);
+    if (bad.length) { $('#pl-msg').textContent = 'Not saved: ' + bad.join('; ') + '.'; return; }
+    if (!EDIT.id) {
+      let id = slug(EDIT.name), n = 2;
+      while (PLANS.some(x => x.id === id)) id = `${slug(EDIT.name)}-${n++}`;
+      EDIT.id = id;
+    }
+    EDIT.updated = new Date().toISOString();
+    $('#pl-save').disabled = true;
+    $('#pl-msg').textContent = 'Saving…';
+    try {
+      await putFile(`${PLANS_DIR}/${EDIT.id}.json`,
+                    JSON.stringify(EDIT, null, 2) + '\n', `Plan "${EDIT.name}" from the app`);
+    } catch (e) {
+      $('#pl-save').disabled = false;
+      $('#pl-msg').textContent = writeError(e, 'save plans');
+      return;
+    }
+    const at = PLANS.findIndex(x => x.id === EDIT.id);
+    if (at >= 0) PLANS[at] = clone(EDIT); else PLANS.unshift(clone(EDIT));
+    LS.set(`ft.plan.${EDIT.id}.json`, JSON.stringify(EDIT));
+    EDIT_DIRTY = false;
+    renderEditor();
+    document.getElementById('pl-msg').textContent =
+      'Saved. New or changed legs are priced at the next price check.';
+  };
+  if ($('#pl-del')) $('#pl-del').onclick = async () => {
+    if (!confirm(`Delete the plan "${EDIT.name}"? Bookings are not affected.`)) return;
+    try {
+      const path = `${PLANS_DIR}/${EDIT.id}.json`;
+      const r = await api(`/repos/${CFG.owner}/${CFG.repo}/contents/${path}`
+                          + `?ref=${CFG.ref}&t=${Date.now()}`, {cache: 'no-store'});
+      const sha = (await r.json()).sha;
+      await api(`/repos/${CFG.owner}/${CFG.repo}/contents/${path}`, {method: 'DELETE',
+        body: JSON.stringify({message: `Delete plan "${EDIT.name}"`, sha, branch: CFG.ref})});
+    } catch (e) {
+      $('#pl-msg').textContent = writeError(e, 'delete plans');
+      return;
+    }
+    PLANS = PLANS.filter(x => x.id !== EDIT.id);
+    EDIT = clone(PLANS[0] || blankPlan());
+    EDIT_DIRTY = false;
+    renderEditor();
+  };
+}
 </script>
 </body></html>
