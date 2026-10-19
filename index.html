@@ -436,6 +436,13 @@ footer{color:var(--dim);font-size:12px;margin-top:26px;line-height:1.6}
 .popts .dim{font-size:11.5px}
 .pempty{max-width:520px;margin:40px auto;padding:0 20px;color:var(--dim)}
 .pempty h2{color:inherit;font-size:18px}
+
+/* The Plan tab: a laptop board, so its tab is offered only on a wide
+   screen; reached on a phone by address, it explains instead. */
+.tabs a.wideonly{display:none}
+@media (min-width:900px){ .tabs a.wideonly{display:block} }
+#planview{height:calc(100dvh - 42px - 46px)}
+#planview iframe{width:100%;height:100%;border:0;display:block}
 </style>
 </head><body>
 <div id="appbar" class="appbar"><span class="as">Starting…</span></div>
@@ -443,11 +450,13 @@ footer{color:var(--dim);font-size:12px;margin-top:26px;line-height:1.6}
 <div id="appedit" hidden></div>
 <nav id="tabs" class="tabs" hidden>
   <a href="#trips" data-tab="trips">Trips</a>
+  <a href="#plan" data-tab="plan" class="wideonly">Plan</a>
   <a href="#prices" data-tab="prices">Prices</a>
   <a href="#review" data-tab="review">Review <span id="rbadge" class="badge" hidden></span></a>
 </nav>
 <div id="reviewview" hidden></div>
 <div id="pricesview" hidden></div>
+<div id="planview" hidden></div>
 <noscript><p style="padding:24px">This app needs JavaScript: it fetches your
 bookings from a private repository in the browser.</p></noscript>
 <div class="wrap" hidden>
@@ -1376,7 +1385,7 @@ if (D) render();
 // page before the network is consulted at all.
 // ---------------------------------------------------------------------------
 
-const CFG = {"owner":"adeshag17","repo":"vietnam-flights","ref":"master","workflow":"sync-mail.yml","payload":"data/trips-payload.json","review":"data/review-payload.json","prices":"data/prices-payload.json","shell":"21"};
+const CFG = {"owner":"adeshag17","repo":"vietnam-flights","ref":"master","workflow":"sync-mail.yml","payload":"data/trips-payload.json","review":"data/review-payload.json","prices":"data/prices-payload.json","pool":"data/flights.json","bundles":"data/bundles.json","shell":"22"};
 
 const K = {token: 'ft.token', data: 'ft.payload', at: 'ft.payload.at',
            etag: 'ft.payload.etag'};
@@ -1399,7 +1408,7 @@ const sh   = s => document.getElementById('shellmsg').innerHTML = s;
 //
 // Inside the app, the tab is part of the address (#review), so the phone's
 // back button and a reload both land where you were.
-const TABS = ['trips', 'prices', 'review'];
+const TABS = ['trips', 'plan', 'prices', 'review'];
 function tab() {
   const h = location.hash.slice(1);
   return TABS.includes(h) ? h : 'trips';
@@ -1412,6 +1421,7 @@ function show(what) {
   page().hidden = !app || tab() !== 'trips';
   document.getElementById('reviewview').hidden = !app || tab() !== 'review';
   document.getElementById('pricesview').hidden = !app || tab() !== 'prices';
+  document.getElementById('planview').hidden = !app || tab() !== 'plan';
 }
 
 function token()        { return LS.get(K.token) || ''; }
@@ -2096,6 +2106,7 @@ function route() {
   paintTabs();
   if (now === 'review') openReview();
   if (now === 'prices') openPrices();
+  if (now === 'plan') openPlan();
 }
 addEventListener('hashchange', route);
 
@@ -2261,9 +2272,112 @@ function renderPrices(p) {
     ${cards}</div>`;
 }
 
+// ---------------------------------------------------------------------------
+// The Plan tab: the trip planner's drag-and-drop board, on a big screen.
+//
+// The board is plan.html - the laptop planner's own page and code, with no
+// data in it, published beside this one - in a frame. The app fetches the
+// fare pool and the saved bundles from the private repository and hands
+// them in, and takes the planner's three buttons: Save bundles writes the
+// same two files the laptop's server does, Rebuild pool starts the cloud
+// rebuild, Sync fetches again.
+// ---------------------------------------------------------------------------
+
+const WIDE = '(min-width: 900px)';
+let PLAN = null;
+
+async function openPlan(force) {
+  const host = document.getElementById('planview');
+  if (!matchMedia(WIDE).matches) {
+    host.innerHTML = `<div class="pempty"><h2>Plan is for a bigger screen</h2>
+      <p>The planner is a drag-and-drop board built for a laptop. Open the
+      app on one and choose <b>Plan</b>. Prices for what is still to book
+      are on the <a href="#prices">Prices</a> tab.</p></div>`;
+    return;
+  }
+  // Leaving the tab and coming back keeps the board as it was.
+  if (PLAN && !force && host.querySelector('iframe')) return;
+  host.innerHTML = '<div class="pempty">Loading the fare pool…</div>';
+  const [dump, bundles] = await Promise.all([
+    fetchData(CFG.pool, 'ft.pool'), fetchData(CFG.bundles, 'ft.bundles')]);
+  if (!dump) {
+    host.innerHTML = `<div class="pempty"><h2>The fare pool did not load</h2>
+      <p>${navigator.onLine ? 'GitHub did not send it.' : 'You are offline.'}
+      Try again in a moment.</p></div>`;
+    return;
+  }
+  PLAN = {dump, bundles};
+  host.innerHTML = '<iframe id="pframe" title="Plan" src="plan.html"></iframe>';
+}
+
+window.__planDump = () => PLAN.dump;
+window.__planBundles = () => PLAN.bundles;
+
+// Replace a whole file in the repository, from the version it has now. A
+// conflict means it moved underneath - read again and retry, as the edits
+// file does.
+async function putFile(path, text, message) {
+  for (let attempt = 1; ; attempt++) {
+    let sha;
+    try {
+      const r = await api(`/repos/${CFG.owner}/${CFG.repo}/contents/${path}`
+                          + `?ref=${CFG.ref}&t=${Date.now()}`, {cache: 'no-store'});
+      sha = (await r.json()).sha;
+    } catch (e) {
+      if (e.message !== 'token-scope') throw e;   // 404: a new file
+    }
+    const body = {message: message, content: b64(text), branch: CFG.ref};
+    if (sha) body.sha = sha;
+    try {
+      await api(`/repos/${CFG.owner}/${CFG.repo}/contents/${path}`,
+                {method: 'PUT', body: JSON.stringify(body)});
+      return;
+    } catch (e) {
+      if (e.status !== 409 || attempt >= 4) throw e;
+      await new Promise(r => setTimeout(r, 800 * attempt));
+    }
+  }
+}
+
+window.__planWrite = async (action, body) => {
+  try {
+    if (action === 'save-bundles') {
+      // What the laptop's server writes, in the same shape.
+      await putFile(CFG.bundles, JSON.stringify(body, null, 2),
+                    'Save bundles from the app');
+      if (body.trip_config)
+        await putFile('data/trip-config.json',
+                      JSON.stringify(body.trip_config, null, 2),
+                      'Save trip shape from the app');
+      PLAN.bundles = body;
+      LS.set('ft.bundles', JSON.stringify(body));
+      return {ok: true, stale: []};
+    }
+    if (action === 'rebuild') {
+      await api(`/repos/${CFG.owner}/${CFG.repo}/actions/workflows/`
+                + `refresh-pool.yml/dispatches`,
+                {method: 'POST', body: JSON.stringify({ref: CFG.ref})});
+      return {ok: true, stale: []};
+    }
+    if (action === 'sync') {
+      openPlan(true);                 // fetch both again, and reload the board
+      return {ok: true, stale: []};
+    }
+    return {ok: false, output: 'not available in the app'};
+  } catch (e) {
+    return {ok: false, output: writeError(e, 'save bundles')};
+  }
+};
+
 // Open the app on whichever tab the address names, with the Review count on
 // its tab. Only Check mail moves you to Review by itself.
-start().then(() => loadReview(false));
+start().then(() => {
+  loadReview(false);
+  // Arriving on a tab's address - a link, a bookmark, a reload - showed its
+  // panel but never filled it: tabs were only loaded on switching to them.
+  if (tab() === 'prices') openPrices();
+  if (tab() === 'plan') openPlan();
+});
 checkForUpdate();
 </script>
 </body></html>

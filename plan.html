@@ -1,0 +1,1435 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Vietnam trip planner</title>
+<style>
+:root{
+  --surface-0:#f4f3f0; --surface-1:#fcfcfb; --border:#e3e1dc;
+  --text-primary:#0b0b0b; --text-secondary:#52514e; --text-muted:#78766f;
+  --series-1:#2a78d6; --series-1-fill:rgba(42,120,214,.12);
+  --good:#0ca30c; --critical:#d03b3b; --warning:#fab219; --grid:#e8e6e1;
+  color-scheme:light;
+}
+@media (prefers-color-scheme:dark){
+  :root:where(:not([data-theme="light"])){
+    --surface-0:#111110; --surface-1:#1a1a19; --border:#2f2f2c;
+    --text-primary:#ffffff; --text-secondary:#c3c2b7; --text-muted:#8f8e85;
+    --series-1:#3987e5; --series-1-fill:rgba(57,135,229,.18);
+    --good:#0ca30c; --critical:#d03b3b; --warning:#fab219; --grid:#2a2a27;
+    color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --surface-0:#111110; --surface-1:#1a1a19; --border:#2f2f2c;
+  --text-primary:#ffffff; --text-secondary:#c3c2b7; --text-muted:#8f8e85;
+  --series-1:#3987e5; --series-1-fill:rgba(57,135,229,.18);
+  --good:#0ca30c; --critical:#d03b3b; --warning:#fab219; --grid:#2a2a27;
+  color-scheme:dark;
+}
+
+*{box-sizing:border-box}
+body{margin:0;padding:18px 16px 60px;background:var(--surface-0);color:var(--text-primary);
+  font:13.5px/1.5 ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+.wrap{max-width:1560px;margin:0 auto}
+h1{font-size:20px;margin:0 0 2px;letter-spacing:-.01em}
+.lede{color:var(--text-secondary);margin:0 0 2px;font-size:13px}
+.runbar{color:var(--text-muted);font-size:11.5px;margin:0 0 16px}
+.panel{background:var(--surface-1);border:1px solid var(--border);border-radius:11px;padding:13px 14px}
+.sectitle{font-size:11px;text-transform:uppercase;letter-spacing:.07em;color:var(--text-muted);
+  margin:0 0 9px;font-weight:600}
+.board{display:grid;grid-template-columns:240px minmax(400px,440px) 1fr;gap:14px;align-items:start}
+@media (max-width:1320px){.board{grid-template-columns:1fr}}
+.boardtitle{margin:22px 0 9px}
+
+/* The summary is the one thing that should read at a glance, so it gets the
+   only large type on the page besides the bundle totals. */
+.summary{padding:4px 6px}
+.cmp{display:flex;gap:10px;overflow-x:auto;padding:8px 6px}
+.cmpcard{flex:1 1 0;min-width:210px;border:1px solid var(--border);border-radius:10px;
+  padding:11px 13px;cursor:pointer;background:transparent;text-align:left;
+  font-family:inherit;color:inherit;position:relative;transition:border-color .12s}
+.cmpcard:hover{border-color:var(--series-1)}
+.cmpcard.on{border-color:var(--series-1);box-shadow:inset 0 0 0 1px var(--series-1)}
+.cmpcard.best{background:color-mix(in srgb,var(--good) 6%,transparent)}
+.cmpname{display:flex;align-items:center;gap:6px;font-size:12.5px;font-weight:600;margin-bottom:3px}
+.cmptot{font-size:26px;font-weight:650;letter-spacing:-.02em;font-variant-numeric:tabular-nums;
+  line-height:1.15;display:block}
+.cmpdelta{font-size:11.5px;margin-top:1px}
+.cmpstats{display:flex;gap:12px;margin-top:8px;padding-top:8px;border-top:1px solid var(--grid)}
+.cmpstat{font-size:11px;color:var(--text-muted);line-height:1.35}
+.cmpstat b{display:block;font-size:12.5px;color:var(--text-primary);font-weight:600;
+  font-variant-numeric:tabular-nums}
+
+/* left rail */
+.trav{display:flex;flex-direction:column;gap:6px;margin-bottom:16px}
+.travrow{display:flex;align-items:center;gap:8px;padding:6px 8px;border:1px solid var(--border);
+  border-radius:8px;cursor:pointer;background:transparent;text-align:left;font:inherit;color:inherit;width:100%}
+.travrow[aria-pressed="false"]{opacity:.42}
+.dot{width:9px;height:9px;border-radius:50%;flex:none}
+.travrow b{font-size:12.5px;font-weight:600;display:block}
+.travrow span{font-size:11px;color:var(--text-muted)}
+.stop{border:1px solid var(--border);border-radius:8px;padding:8px 9px;margin-bottom:7px}
+.stop b{font-size:12.5px}
+.stop .row{display:flex;align-items:center;gap:6px;margin-top:6px}
+.stop label{font-size:11px;color:var(--text-muted);min-width:36px}
+input[type=number],select{font:inherit;font-size:12px;padding:3px 6px;border-radius:6px;
+  border:1px solid var(--border);background:var(--surface-0);color:var(--text-primary);width:62px}
+/* Filters live with the pool they filter, laid out across rather than down so
+   they cost little vertical space above the cards. */
+.filters{border-bottom:1px solid var(--grid);padding-bottom:9px;margin-bottom:9px}
+.filters label{font-size:10.5px;color:var(--text-muted);display:block;margin:0 0 2px}
+.frow{display:flex;gap:7px;margin-bottom:6px}
+.frow>span{flex:1 1 0;min-width:0}
+.frow>span.wide{flex:1.5 1 0}
+.filters select,.filters input{width:100%;min-width:0}
+.filters .chk label.inline{display:flex;align-items:center;gap:5px;font-size:11.5px;
+  color:var(--text-secondary);margin:0;padding:4px 0;white-space:nowrap}
+.filters .chk input[type=checkbox]{width:auto;flex:none;margin:0}
+.sortrow{display:flex;gap:4px}
+.sortrow select:first-child{flex:1;min-width:0}
+.sortrow select:last-child{width:46px;flex:none}
+.tedit{border:1px solid var(--border);border-radius:8px;padding:8px 9px;margin-bottom:6px}
+.tedit .tr{display:flex;gap:5px;align-items:center;margin-top:5px}
+.tedit .tr label{font-size:10.5px;color:var(--text-muted);width:30px;flex:none;margin:0}
+.tedit input{width:100%;font-size:11.5px}
+.tedit input.code{text-transform:uppercase}
+.note{font-size:10.5px;color:var(--warning);margin:5px 0 0}
+
+/* pool */
+.slotname{font-size:12px;color:var(--text-secondary);margin:0 0 8px}
+.slotname b{color:var(--text-primary)}
+.card{border:1px solid var(--border);border-radius:9px;padding:8px 9px;margin-bottom:6px;
+  cursor:grab;background:var(--surface-1)}
+.card:active{cursor:grabbing}
+.card.dragging{opacity:.4}
+.card:hover{border-color:var(--series-1)}
+.card .top{display:flex;justify-content:space-between;gap:8px;align-items:baseline}
+.card .air{font-weight:600;font-size:12.5px}
+.card .pr{font-weight:650;font-variant-numeric:tabular-nums;white-space:nowrap}
+.card .mid{font-size:11.5px;color:var(--text-secondary);font-variant-numeric:tabular-nums;margin-top:2px}
+.card .tags{margin-top:4px;display:flex;gap:4px;flex-wrap:wrap}
+.tag{font-size:10px;padding:1px 6px;border-radius:999px;border:1px solid var(--border);color:var(--text-muted)}
+.tag.bad{color:var(--critical);border-color:color-mix(in srgb,var(--critical) 40%,transparent)}
+.tag.warn{color:var(--warning);border-color:color-mix(in srgb,var(--warning) 55%,transparent)}
+.tag.good{color:var(--good);border-color:color-mix(in srgb,var(--good) 40%,transparent)}
+.poolscroll{max-height:660px;overflow-y:auto;padding-right:3px}
+
+/* bundles */
+.bundles{display:flex;gap:12px;align-items:start;overflow-x:auto;padding-bottom:4px}
+.bundle{flex:1 1 0;min-width:300px;background:var(--surface-1);border:1px solid var(--border);
+  border-radius:11px;padding:11px 12px}
+.bundle.active{border-color:var(--series-1);box-shadow:0 0 0 1px var(--series-1)}
+.bhead{display:flex;align-items:center;gap:7px;margin-bottom:3px}
+.bname{font-weight:650;font-size:14px;background:transparent;border:none;color:inherit;
+  font-family:inherit;padding:1px 3px;border-radius:5px;min-width:0;flex:1}
+.bname:hover,.bname:focus{background:var(--surface-0);outline:none}
+.btot{font-size:18px;font-weight:650;font-variant-numeric:tabular-nums;letter-spacing:-.01em}
+.bsub{font-size:11px;color:var(--text-muted);margin-bottom:9px}
+.miniact{font-size:11px;padding:3px 8px;border-radius:7px;border:1px solid var(--border);
+  background:transparent;color:var(--text-secondary);cursor:pointer;font-family:inherit;white-space:nowrap}
+.miniact:hover{border-color:var(--series-1);color:var(--series-1)}
+.gblock{border-top:1px solid var(--grid);padding-top:6px;margin-top:6px}
+.glabel{display:flex;align-items:center;gap:6px;font-size:11.5px;font-weight:600;margin-bottom:4px}
+.glabel .hrs{margin-left:auto;font-weight:400;color:var(--text-muted);font-variant-numeric:tabular-nums}
+.slot{border:1px dashed var(--border);border-radius:7px;padding:4px 7px;margin-bottom:3px;
+  font-size:11.5px;cursor:pointer;background:transparent;width:100%;text-align:left;
+  font-family:inherit;color:var(--text-secondary);display:block}
+.slot.filled{border-style:solid;color:var(--text-primary)}
+.slot.focused{border-color:var(--series-1);background:color-mix(in srgb,var(--series-1) 8%,transparent)}
+.slot.over{border-color:var(--good);background:color-mix(in srgb,var(--good) 12%,transparent)}
+.slot.valid{border-color:color-mix(in srgb,var(--good) 55%,transparent)}
+.slot .sk{font-size:10px;text-transform:uppercase;letter-spacing:.05em;color:var(--text-muted)}
+.slot .sv{font-variant-numeric:tabular-nums}
+.slot .sx{float:right;color:var(--text-muted)}
+
+/* timeline */
+.tlwrap{overflow-x:auto}
+.tl{min-width:760px}
+.tlrow{display:grid;grid-template-columns:150px 1fr;gap:10px;align-items:center;margin-bottom:5px}
+.tlname{font-size:11.5px;color:var(--text-secondary);text-align:right;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tltrack{position:relative;height:26px;background:var(--surface-0);border-radius:6px;
+  border:1px solid var(--grid)}
+.bar{position:absolute;top:3px;height:20px;border-radius:4px;font-size:10px;line-height:20px;
+  padding:0 5px;color:#fff;white-space:nowrap;overflow:hidden;box-shadow:0 0 0 2px var(--surface-0)}
+.bar.transit{background:var(--text-muted);opacity:.55;color:#fff}
+.bar.sgn{background:var(--series-1)}
+.bar.pqc{background:#1baf7a}
+.tlaxis{display:grid;grid-template-columns:150px 1fr;gap:10px;margin-bottom:4px}
+.ticks{position:relative;height:15px}
+.tick{position:absolute;font-size:10px;color:var(--text-muted);transform:translateX(-50%)}
+.tlkey{display:flex;gap:12px;font-size:11px;color:var(--text-muted);margin-top:8px;flex-wrap:wrap}
+.tlkey i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:4px;vertical-align:-1px}
+
+/* compare strip */
+table{width:100%;border-collapse:collapse;font-size:12px}
+th{text-align:left;font-weight:600;color:var(--text-secondary);border-bottom:1px solid var(--border);
+  padding:5px 9px 5px 0;white-space:nowrap}
+td{padding:5px 9px 5px 0;border-bottom:1px solid var(--grid);color:var(--text-secondary)}
+tr:last-child td{border-bottom:none}
+.num{font-variant-numeric:tabular-nums;white-space:nowrap}
+.win{color:var(--good);font-weight:650}
+.empty{color:var(--text-muted);font-size:12.5px;margin:10px 0}
+footer{max-width:1560px;margin:26px auto 0;color:var(--text-muted);font-size:11.5px;line-height:1.7}
+code{background:var(--surface-1);padding:1px 5px;border-radius:4px;font-size:11px;
+  font-family:ui-monospace,SFMono-Regular,Consolas,monospace}
+</style>
+</head><body>
+<div class="wrap">
+  <h1>Vietnam trip planner</h1>
+  <p class="lede">Drag flights into bundles, then read the timeline to see what
+     each traveller's holiday actually looks like.</p>
+  <p class="runbar">
+    <span id="runstats">loading the fare pool…</span>
+  </p>
+  <p class="runbar" style="margin-top:-13px">
+    <button class="miniact" id="act-sync" title="Pull the latest prices and rebuild this page">Sync</button>
+    <button class="miniact" id="act-rebuild" title="Start a full pool rebuild in the cloud">Rebuild pool</button>
+    <button class="miniact" id="act-save" title="Write your bundles into the project and push, so the cloud watches them">Save bundles</button>
+    <button class="miniact" id="export" title="Download bundles.json instead (for when the planner is not being served)">Download</button>
+    <button class="miniact" id="reseed">Reset bundles</button>
+    <a class="miniact" style="text-decoration:none" target="_blank" rel="noopener" href="https://github.com/adeshag17/vietnam-flights/actions" title="Watch the cloud runs on GitHub">Actions &#8599;</a>
+    <span id="livestatus" style="margin-left:8px"></span>
+  </p>
+
+  <!-- The answer first: how the bundles compare, and what the chosen one
+       actually gives each traveller. Editing comes below. -->
+  <section class="panel summary">
+    <div id="compare"></div>
+  </section>
+
+  <section class="panel">
+    <p class="sectitle" id="tlhead">Timeline</p>
+    <div id="timeline"></div>
+  </section>
+
+  <p class="sectitle boardtitle">Build and compare</p>
+  <div class="board">
+    <div>
+      <div class="panel">
+        <p class="sectitle">Travellers</p>
+        <div class="trav" id="travellers"></div>
+        <p class="sectitle">Nights at each stop</p>
+        <div id="spine"></div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <p class="sectitle">Flight pool</p>
+      <p class="slotname" id="poolhead"></p>
+      <div class="filters">
+        <div class="frow">
+          <span><label>Date</label>
+            <select data-filter="date" id="f-date"><option value="">any</option></select></span>
+          <span><label>Max layover (h)</label>
+            <input type="number" data-filter="maxLayover" min="1" max="12" placeholder="any"></span>
+          <span><label>Stops</label>
+            <select data-filter="maxStops"><option value="">any</option>
+              <option value="0">nonstop</option><option value="1">1 stop</option></select></span>
+          <span class="chk"><label>Full service</label>
+            <label class="inline"><input type="checkbox" data-filter="fullService">
+              bag + meal included</label></span>
+        </div>
+        <div class="frow">
+          <span><label>Max per person</label>
+            <input type="number" data-filter="maxPrice" step="1000" placeholder="any"></span>
+          <span><label>Airline</label>
+            <input type="text" data-filter="airline" placeholder="e.g. Vietjet"></span>
+        </div>
+        <div class="frow">
+          <span class="wide"><label>Sort by</label>
+            <div class="sortrow">
+              <select data-filter="sort1">
+                <option value="price">price</option><option value="date">date</option>
+                <option value="depart">dep time</option><option value="arrive">arr time</option>
+                <option value="duration">duration</option>
+                <option value="stops">stops</option><option value="layover">layover</option>
+                <option value="airline">airline</option>
+              </select>
+              <select data-filter="dir1"><option value="asc">&uarr;</option>
+                <option value="desc">&darr;</option></select>
+            </div></span>
+          <span class="wide"><label>Then by</label>
+            <div class="sortrow">
+              <select data-filter="sort2">
+                <option value="">none</option>
+                <option value="duration" selected>duration</option><option value="price">price</option>
+                <option value="date">date</option>
+                <option value="depart">dep time</option><option value="arrive">arr time</option>
+                <option value="stops">stops</option><option value="layover">layover</option>
+                <option value="airline">airline</option>
+              </select>
+              <select data-filter="dir2"><option value="asc">&uarr;</option>
+                <option value="desc">&darr;</option></select>
+            </div></span>
+          <span><label>&nbsp;</label>
+            <button class="miniact" id="fclear" style="width:100%">Clear</button></span>
+        </div>
+      </div>
+      <div class="poolscroll" id="pool"></div>
+    </div>
+
+    <div class="bundles" id="bundles"></div>
+  </div>
+</div>
+<footer>
+  Prices are what Google Flights showed when the pool was collected
+  (the time shown above); they move constantly and are not quotes. Bag fees come from the
+  table in <code>trip.py</code>, not from Google - a <code>*</code> marks an
+  airline that fell back to the default. Fare rules and change fees are not
+  available in this data at all.<br>
+  Bundles live in this browser and in <code>bundles.json</code> when you export.
+  Refresh the pool with <code>python flights.py plan --refresh</code>.
+</footer>
+<script>// Runs inside the Plan tab's frame, before the planner itself.
+//
+// The page is public and carries no data, so everything comes from the app
+// around it: the fare pool and the saved bundles, both fetched from the
+// private repository with the person's token. And the planner's buttons -
+// which on the laptop post to its server - get the app's writer instead.
+window.__DUMP__ = parent.__planDump();
+window.__planApi = (action, body) => parent.__planWrite(action, body);
+
+(function () {
+  const d = window.__DUMP__;
+  const offers = d.flights.reduce((n, f) => n + f.offers.length, 0);
+  const when = new Date(d.generated_at).toLocaleString('en-GB', {
+    day: 'numeric', month: 'short', year: 'numeric',
+    hour: '2-digit', minute: '2-digit'});
+  const stats = document.getElementById('runstats');
+  if (stats) stats.textContent = `${d.totals.people} travellers · ${offers} ` +
+    `flights across ${d.flights.length} route-dates · collected ${when} from ` +
+    d.provider;
+
+  // The planner keeps its working bundles in this browser. A browser that
+  // has never opened it starts from the bundles saved to the repository -
+  // the ones the cloud prices - rather than from blank defaults.
+  try {
+    const KEY = 'vietnam-bundles-v2';
+    if (localStorage.getItem(KEY)) return;
+    const saved = parent.__planBundles();
+    if (!saved || !saved.bundles || !saved.bundles.length) return;
+    const base = saved.bundles.find(b => b.baseline);
+    localStorage.setItem(KEY, JSON.stringify({
+      bundles: saved.bundles.map(b => ({id: b.id, name: b.name, picks: b.picks})),
+      shape: saved.shape,
+      baseline: base ? base.id : null,
+      travellers: saved.travellers,
+    }));
+  } catch (e) { /* storage unavailable: the planner seeds its own */ }
+})();
+</script>
+<script>
+const D = window.__DUMP__;
+const CUR = D.currency;
+const SLOTS = [
+  {key:'hop',      optional:true},
+  {key:'out',      optional:false},
+  {key:'domestic', optional:false},
+  {key:'home',     optional:false},
+];
+
+// Slot names spell out the actual route for that traveller. "Home" means
+// different things for different people - Disha flies back to Mumbai, not
+// Singapore - and a generic label makes you work that out yourself.
+function slotLabel(t, key, bundle){
+  if (key === 'domestic') return 'SGN → PQC (whole party)';
+  if (key === 'home')     return 'PQC → ' + t.home + ' (home)';
+  if (key === 'hop')      return t.origin + ' → ' + (t.self_connect_via||[]).join('/') +
+                                 ' (optional self-connect)';
+  const hop = bundle && bundle.picks[t.key+'|hop'];
+  return (hop ? hop.via : t.origin) + ' → SGN';
+}
+
+function slotHint(t, key){
+  if (key === 'hop') return 'optional — a domestic hop first, then a nonstop from there';
+  return 'empty — click, then pick from the pool';
+}
+const HUE = ['#2a78d6','#eb6834','#1baf7a','#eda100','#e87ba4','#4a3aa7'];
+
+// ---------- helpers -------------------------------------------------------
+function money(n){
+  if (n==null) return '--';
+  const neg=n<0, a=Math.abs(Math.round(n));
+  if (CUR==='INR'){
+    const d=String(a); let s=d;
+    if (d.length>3){ let h=d.slice(0,-3), t=d.slice(-3), p=[];
+      while(h.length>2){p.unshift(h.slice(-2));h=h.slice(0,-2);} if(h)p.unshift(h);
+      s=p.join(',')+','+t; }
+    return (neg?'-':'')+'₹'+s;
+  }
+  return (neg?'-':'')+CUR+' '+a.toLocaleString();
+}
+function esc(s){return String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
+function dur(m){const h=Math.floor(m/60);return h+'h '+String(Math.round(m%60)).padStart(2,'0')+'m';}
+function hrs(ms){return (ms/3600000);}
+function fmtH(h){
+  if (h == null) return '--';
+  let d = Math.floor(h / 24), r = Math.round(h % 24);
+  // Rounding the remainder can land on 24, which has to roll into the day
+  // rather than print as "3d 24h".
+  if (r === 24){ d += 1; r = 0; }
+  return d > 0 ? d + 'd ' + r + 'h' : r + 'h';
+}
+const MON=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+function dmy(iso){const p=iso.slice(0,10).split('-');return (+p[2])+' '+MON[+p[1]-1];}
+function T(iso){return new Date(iso+(iso.length<=16?':00':'')).getTime();}
+
+const TRAV = {}; D.travellers.forEach((t,i)=>{TRAV[t.key]=t; t.hue=HUE[i%HUE.length];});
+
+// index the pool: role|group|date|via -> entry
+const POOL = {};
+D.flights.forEach(f=>{ POOL[[f.role,f.group||'',f.date,f.via||''].join('|')] = f; });
+
+// ---------- trip shape (left rail) ---------------------------------------
+const SHAPE = D.spine.map(s=>({...s}));
+
+// The date envelopes decide what the collector fetches. Editing them here does
+// nothing on its own - the pool has to be rebuilt afterwards - so the editor
+// says so rather than letting you think a wider window found new flights.
+const ENVELOPE = {
+  arrive:   {from: D.dates.arrive[0],   to: D.dates.arrive[D.dates.arrive.length-1]},
+  domestic: {from: D.dates.domestic[0], to: D.dates.domestic[D.dates.domestic.length-1]},
+  home:     {from: D.dates.home[0],     to: D.dates.home[D.dates.home.length-1]},
+};
+const ENVELOPE_LABELS = {
+  arrive: 'Arrive ' + D.spine[0].code,
+  domestic: D.spine[0].code + ' → ' + D.spine[1].code,
+  home: 'Fly home',
+};
+
+function envelopeDirty(){
+  return ENVELOPE.arrive.from   !== D.dates.arrive[0]
+      || ENVELOPE.arrive.to     !== D.dates.arrive[D.dates.arrive.length-1]
+      || ENVELOPE.domestic.from !== D.dates.domestic[0]
+      || ENVELOPE.domestic.to   !== D.dates.domestic[D.dates.domestic.length-1]
+      || ENVELOPE.home.from     !== D.dates.home[0]
+      || ENVELOPE.home.to       !== D.dates.home[D.dates.home.length-1];
+}
+
+function travellersDirty(){
+  return D.travellers.some(t=>{
+    const o = ORIGINAL[t.key];
+    return o && (o.origin !== t.origin || o.home !== t.home
+              || o.adults !== t.adults || o.children !== t.children);
+  });
+}
+
+const ORIGINAL = {};
+D.travellers.forEach(t=>{
+  ORIGINAL[t.key] = {origin:t.origin, home:t.home, adults:t.adults, children:t.children};
+});
+
+function dateAdd(iso, days){
+  const d = new Date(iso+'T00:00:00'); d.setDate(d.getDate()+days);
+  return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+}
+
+// Every (arrive, transfer, home) combination the nights + flex settings allow.
+// Slots are filtered against these, and auto-fill picks from them as a set
+// rather than choosing each slot's cheapest in isolation - otherwise you get a
+// Phu Quoc flight that leaves the day before the traveller lands in Saigon.
+function legalTriples(){
+  const [sgn, pqc] = SHAPE, out = [];
+  D.dates.arrive.forEach(a=>{
+    for (let n1 = Math.max(sgn.nights-sgn.flex,0); n1 <= sgn.nights+sgn.flex; n1++){
+      const dom = dateAdd(a, n1);
+      if (!D.dates.domestic.includes(dom)) continue;
+      for (let n2 = Math.max(pqc.nights-pqc.flex,0); n2 <= pqc.nights+pqc.flex; n2++){
+        const hm = dateAdd(dom, n2);
+        if (!D.dates.home.includes(hm)) continue;
+        out.push({a, dom, hm, n1, n2});
+      }
+    }
+  });
+  return out;
+}
+
+function legalDates(){
+  const out = {out:new Set(), domestic:new Set(), home:new Set()};
+  legalTriples().forEach(t=>{ out.out.add(t.a); out.domestic.add(t.dom); out.home.add(t.hm); });
+  return out;
+}
+
+// ---------- bundles -------------------------------------------------------
+const STORE_KEY = 'vietnam-bundles-v2';
+let BUNDLES = [], ACTIVE = 0, FOCUS = null;   // FOCUS = {group, slot}
+let BASELINE_ID = null;   // a bundle to measure the others against
+const FILTERS = {date:'', maxStops:'', maxLayover:'', maxPrice:'', airline:'',
+                 fullService:false,
+                 sort1:'price', sort2:'duration', dir1:'asc', dir2:'asc'};
+
+// Sort keys. "arrive" is the one that decides how many hours on the ground a
+// flight buys you, which is why it is worth sorting by even though price is
+// the obvious default.
+const SORTERS = {
+  price:    o => o.pp_with_bag,
+  // Date alone, so the secondary key orders within each day. "depart" sorts
+  // by the full timestamp, which is date and time together.
+  date:     o => o.date || o.dep_iso.slice(0,10),
+  duration: o => o.duration_min,
+  depart:   o => o.dep_iso,
+  arrive:   o => o.arr_iso,
+  stops:    o => o.stops,
+  layover:  o => o.max_layover_min,
+  airline:  o => o.airline_label.toLowerCase(),
+};
+
+function compareOffers(a, b){
+  for (const [key, dir] of [[FILTERS.sort1, FILTERS.dir1], [FILTERS.sort2, FILTERS.dir2]]){
+    if (!key || !SORTERS[key]) continue;
+    const va = SORTERS[key](a.o), vb = SORTERS[key](b.o);
+    if (va < vb) return dir === 'desc' ? 1 : -1;
+    if (va > vb) return dir === 'desc' ? -1 : 1;
+  }
+  return 0;
+}
+const SHOWN = new Set(D.travellers.map(t=>t.key));
+
+function blank(name){ return {id:'b'+Math.random().toString(36).slice(2,8), name, picks:{}}; }
+
+function travEdits(){
+  const out = {};
+  D.travellers.forEach(t=>{
+    out[t.key] = {origin:t.origin, home:t.home, adults:t.adults, children:t.children};
+  });
+  return out;
+}
+
+function save(){
+  try{
+    localStorage.setItem(STORE_KEY, JSON.stringify({
+      bundles:BUNDLES, shape:SHAPE, baseline:BASELINE_ID, travellers:travEdits(),
+      envelope:ENVELOPE,
+    }));
+  }catch(e){}
+}
+
+function load(){
+  try{
+    const raw = localStorage.getItem(STORE_KEY);
+    if (!raw) return false;
+    const o = JSON.parse(raw);
+    if (o.shape) o.shape.forEach((s,i)=>{ if(SHAPE[i]){SHAPE[i].nights=s.nights; SHAPE[i].flex=s.flex;} });
+    if (o.travellers) Object.keys(o.travellers).forEach(k=>{
+      if (!TRAV[k]) return;
+      Object.assign(TRAV[k], o.travellers[k]);
+      TRAV[k].people = TRAV[k].adults + TRAV[k].children;
+    });
+    if (o.envelope) Object.keys(ENVELOPE).forEach(k=>{
+      if (o.envelope[k]) Object.assign(ENVELOPE[k], o.envelope[k]);
+    });
+    BASELINE_ID = o.baseline || null;
+    if (!o.bundles || !o.bundles.length) return false;
+    BUNDLES = o.bundles;
+    return true;
+  }catch(e){ return false; }
+}
+
+function duplicate(index){
+  const src = BUNDLES[index];
+  const copy = blank(src.name + ' (copy)');
+  copy.picks = JSON.parse(JSON.stringify(src.picks));
+  BUNDLES.push(copy);
+  ACTIVE = BUNDLES.length - 1;
+  save();
+}
+
+// The whole party flies SGN->PQC together, so picking it once and pushing it
+// to everyone is the normal case, not a shortcut.
+function applyToAll(bundle, groupKey, slot){
+  const pick = pickOf(bundle, groupKey, slot);
+  if (!pick) return 0;
+  let n = 0;
+  D.travellers.forEach(t=>{
+    if (t.key === groupKey) return;
+    // Only meaningful where the route is shared - the domestic hop is, an
+    // outbound from someone else's home city is not.
+    const entry = POOL[[pick.role, '', pick.date, pick.via||''].join('|')]
+               || POOL[[pick.role, t.key, pick.date, pick.via||''].join('|')];
+    if (!entry) return;
+    const offer = entry.offers.find(o=>o.fingerprint === pick.fingerprint);
+    if (!offer) return;
+    put(bundle, t.key, slot, entry, offer);
+    n++;
+  });
+  save();
+  return n;
+}
+
+function poolFor(groupKey, slot, bundle){
+  const legal = legalDates();
+  const res = [];
+  const dates = slot==='home' ? D.dates.home : (slot==='domestic' ? D.dates.domestic : D.dates.arrive);
+  dates.forEach(date=>{
+    if (legal[slot==='hop'?'out':slot] && !legal[slot==='hop'?'out':slot].has(date)) return;
+    let entry = null;
+    if (slot==='domestic') entry = POOL[['domestic','',date,''].join('|')];
+    else if (slot==='hop'){
+      (TRAV[groupKey].self_connect_via||[]).forEach(via=>{
+        const e = POOL[['hop',groupKey,date,via].join('|')];
+        if (e) res.push(e);
+      });
+      return;
+    }
+    else if (slot==='out'){
+      const hop = bundle && bundle.picks[groupKey+'|hop'];
+      if (hop){ entry = POOL[['out_via',groupKey,date,hop.via].join('|')]; }
+      else { entry = POOL[['out',groupKey,date,''].join('|')]; }
+    }
+    else if (slot==='home') entry = POOL[['home',groupKey,date,''].join('|')];
+    if (entry) res.push(entry);
+  });
+  return res;
+}
+
+function offersFor(groupKey, slot, bundle){
+  const rows = [];
+  poolFor(groupKey, slot, bundle).forEach(entry=>{
+    entry.offers.forEach(o=> rows.push({entry, o}));
+  });
+  const floor = D.earliest_departure;
+  return rows.filter(({entry, o})=>{
+    // Leaving before the agreed day is not a saving worth surfacing.
+    if (floor && entry.role !== 'home' && (o.date || entry.date) < floor) return false;
+    if (FILTERS.date && (o.date || entry.date) !== FILTERS.date) return false;
+    if (FILTERS.fullService && !o.full_service) return false;
+    if (FILTERS.maxStops!=='' && o.stops > +FILTERS.maxStops) return false;
+    if (FILTERS.maxLayover!=='' && o.max_layover_min > +FILTERS.maxLayover*60) return false;
+    if (FILTERS.maxPrice!=='' && o.pp_with_bag > +FILTERS.maxPrice) return false;
+    if (FILTERS.airline && !o.airline_label.toLowerCase().includes(FILTERS.airline.toLowerCase())) return false;
+    return true;
+  }).sort(compareOffers);
+}
+
+function pickOf(bundle, groupKey, slot){ return bundle.picks[groupKey+'|'+slot] || null; }
+
+function assign(bundle, groupKey, slot, entry, offer){
+  bundle.picks[groupKey+'|'+slot] = {
+    poolId: entry.id, role: entry.role, via: entry.via||null, date: entry.date,
+    route: entry.route, origin: entry.origin, destination: entry.destination,
+    people: entry.people, fingerprint: offer.fingerprint,
+  };
+  // Choosing a first hop invalidates a direct outbound picked earlier.
+  if (slot==='hop'){
+    const out = pickOf(bundle, groupKey, 'out');
+    if (out && out.role !== 'out_via') delete bundle.picks[groupKey+'|out'];
+  }
+  save(); renderAll();
+}
+
+function resolve(pick){
+  if (!pick) return null;
+  const entry = D.flights.find(f=>f.id===pick.poolId);
+  if (!entry) return null;
+  const offer = entry.offers.find(o=>o.fingerprint===pick.fingerprint);
+  return offer ? {entry, o:offer} : null;
+}
+
+function put(bundle, groupKey, slot, entry, offer){
+  bundle.picks[groupKey+'|'+slot] = {
+    poolId:entry.id, role:entry.role, via:entry.via||null, date:entry.date,
+    route:entry.route, origin:entry.origin, destination:entry.destination,
+    people:entry.people, fingerprint:offer.fingerprint,
+  };
+}
+
+function cheapestOf(offers, predicate){
+  let best = null;
+  (offers||[]).forEach(o=>{
+    if (predicate && !predicate(o)) return;
+    if (!best || o.pp_with_bag < best.pp_with_bag) best = o;
+  });
+  return best;
+}
+
+// Auto-fill chooses ONE transfer date for the whole party - everybody flies to
+// Phu Quoc together - then, for each traveller, the cheapest outbound that
+// actually lands before that flight leaves, and the cheapest way home. It
+// scores every candidate transfer date and keeps the cheapest that works for
+// everyone, so the result is always internally consistent.
+function autofill(bundle){
+  const triples = legalTriples();
+  if (!triples.length) return;
+
+  const byDom = {};
+  triples.forEach(t=>{ (byDom[t.dom] = byDom[t.dom] || []).push(t); });
+
+  let winner = null;
+  Object.keys(byDom).forEach(dom=>{
+    const domEntry = POOL[['domestic','',dom,''].join('|')];
+    const domOffer = domEntry && cheapestOf(domEntry.offers);
+    if (!domOffer) return;
+
+    const floor = D.earliest_departure;
+    const arriveDates = [...new Set(byDom[dom].map(t=>t.a))]
+      .filter(a => !floor || a >= floor);
+    const homeDates   = [...new Set(byDom[dom].map(t=>t.hm))];
+
+    let cost = 0, choice = {}, ok = true;
+    D.travellers.forEach(t=>{
+      let bestOut = null, bestHome = null;
+      arriveDates.forEach(a=>{
+        const e = POOL[['out',t.key,a,''].join('|')];
+        // Must be on the ground before the Phu Quoc flight pushes back.
+        const o = e && cheapestOf(e.offers, x=>T(x.arr_iso) < T(domOffer.dep_iso));
+        if (o && (!bestOut || o.pp_with_bag < bestOut.o.pp_with_bag)) bestOut = {e, o};
+      });
+      homeDates.forEach(h=>{
+        const e = POOL[['home',t.key,h,''].join('|')];
+        const o = e && cheapestOf(e.offers, x=>T(x.dep_iso) > T(domOffer.arr_iso));
+        if (o && (!bestHome || o.pp_with_bag < bestHome.o.pp_with_bag)) bestHome = {e, o};
+      });
+      if (!bestOut || !bestHome){ ok = false; return; }
+      cost += bestOut.o.price_total + bestOut.o.bag_pp * t.people
+            + bestHome.o.price_total + bestHome.o.bag_pp * t.people
+            + (domOffer.price_pp + domOffer.bag_pp) * t.people;
+      choice[t.key] = {out:bestOut, home:bestHome};
+    });
+
+    if (ok && (!winner || cost < winner.cost))
+      winner = {cost, domEntry, domOffer, choice};
+  });
+
+  if (!winner){
+    // Nothing coherent exists in the pool for the current nights/flex.
+    return false;
+  }
+  D.travellers.forEach(t=>{
+    const c = winner.choice[t.key];
+    put(bundle, t.key, 'out', c.out.e, c.out.o);
+    put(bundle, t.key, 'domestic', winner.domEntry, winner.domOffer);
+    put(bundle, t.key, 'home', c.home.e, c.home.o);
+  });
+  save();
+  return true;
+}
+
+// ---------- bundle maths --------------------------------------------------
+function analyse(bundle){
+  const per = {}; let total = 0, complete = true;
+  D.travellers.forEach(t=>{
+    const g = {key:t.key, cost:0, travel:0, flags:[], legs:{}, missing:[]};
+    ['hop','out','domestic','home'].forEach(slot=>{
+      const r = resolve(pickOf(bundle,t.key,slot));
+      if (!r){ if (slot!=='hop') g.missing.push(slot); return; }
+      g.legs[slot] = r;
+      // Always price per head then multiply. The domestic hop is quoted for
+      // all seven so it has to be a share anyway, and doing it uniformly means
+      // editing a group's passenger count re-costs correctly instead of
+      // silently keeping the fare that was quoted for the old headcount.
+      g.cost += (r.o.price_pp + r.o.bag_pp) * t.people;
+      g.travel += r.o.duration_min;
+      // The shared hop is quoted for the whole party on purpose, so taking a
+      // share of it is the design, not a discrepancy worth flagging. Anything
+      // else priced for a different headcount is.
+      if (slot !== 'domestic' && t.people !== r.entry.people)
+        g.flags.push({k:'warn', t:'priced for '+r.entry.people+
+          ' - scaled to '+t.people+', refresh to confirm'});
+      if (r.o.bag_estimated) g.flags.push({k:'warn', t:'bag fee estimated'});
+      if (t.prefs.max_stops!=null && r.o.stops>t.prefs.max_stops)
+        g.flags.push({k:'bad', t:'more stops than preferred'});
+      if (t.prefs.max_layover_min && r.o.max_layover_min>t.prefs.max_layover_min)
+        g.flags.push({k:'bad', t:'long layover'});
+      if (t.prefs.redeye_window){
+        const h = +r.o.dep_iso.slice(11,13), [a,b] = t.prefs.redeye_window;
+        if (a>b ? (h>=a||h<b) : (h>=a&&h<b)) g.flags.push({k:'warn', t:'red-eye departure'});
+      }
+    });
+    if (g.missing.length) complete = false;
+
+    if (g.legs.out && g.legs.domestic){
+      g.sgnIn  = T(g.legs.out.o.arr_iso);
+      g.sgnOut = T(g.legs.domestic.o.dep_iso);
+      g.sgnH   = hrs(g.sgnOut - g.sgnIn);
+      if (t.prefs.land_by_hour!=null && +g.legs.out.o.arr_iso.slice(11,13) >= t.prefs.land_by_hour)
+        g.flags.push({k:'warn', t:'lands after '+t.prefs.land_by_hour+':00'});
+      if (g.sgnH < 0) g.flags.push({k:'bad', t:'leaves SGN before landing'});
+    }
+    if (g.legs.domestic && g.legs.home){
+      g.pqcIn  = T(g.legs.domestic.o.arr_iso);
+      g.pqcOut = T(g.legs.home.o.dep_iso);
+      g.pqcH   = hrs(g.pqcOut - g.pqcIn);
+      if (g.pqcH < 0) g.flags.push({k:'bad', t:'leaves PQC before landing'});
+    }
+    if (g.legs.hop && g.legs.out){
+      const gap = hrs(T(g.legs.out.o.dep_iso) - T(g.legs.hop.o.arr_iso));
+      g.connect = gap;
+      g.flags.push(gap < 3
+        ? {k:'bad', t:'self-connect only '+gap.toFixed(1)+'h - separate tickets'}
+        : {k:'warn', t:'self-connect '+gap.toFixed(1)+'h on separate tickets'});
+    }
+    per[t.key] = g; total += g.cost;
+  });
+
+  // When is everybody in the same place?
+  const withSgn = Object.values(per).filter(g=>g.sgnIn!=null);
+  const withPqc = Object.values(per).filter(g=>g.pqcIn!=null);
+  const together = {};
+  if (withSgn.length === D.travellers.length)
+    together.sgn = hrs(Math.min(...withSgn.map(g=>g.sgnOut)) - Math.max(...withSgn.map(g=>g.sgnIn)));
+  if (withPqc.length === D.travellers.length)
+    together.pqc = hrs(Math.min(...withPqc.map(g=>g.pqcOut)) - Math.max(...withPqc.map(g=>g.pqcIn)));
+
+  // Hotels: a flight that saves money by arriving a day early has saved
+  // nothing if it adds a night. Charged per room, per stop, from the nights
+  // the chosen flights actually imply.
+  let hotel = 0;
+  D.travellers.forEach(t=>{
+    const g = per[t.key];
+    if (!g) return;
+    const rooms = t.rooms || Math.max(1, Math.ceil(t.people / 2));
+    g.nights = {};
+    [['sgnH', 0], ['pqcH', 1]].forEach(([field, i])=>{
+      const hours = g[field];
+      if (hours == null || hours <= 0 || !D.spine[i]) return;
+      const nights = Math.max(1, Math.round(hours / 24));
+      g.nights[D.spine[i].code] = nights;
+      hotel += nights * (D.spine[i].room_rate || 0) * rooms;
+    });
+  });
+  const flightsOnly = total;
+  total += hotel;
+
+  const sgnHs = withSgn.map(g=>g.sgnH), pqcHs = withPqc.map(g=>g.pqcH);
+  return {
+    per, total, hotel, flights: flightsOnly, complete, together,
+    minSgn: sgnHs.length?Math.min(...sgnHs):null,
+    minPqc: pqcHs.length?Math.min(...pqcHs):null,
+    baseline: D.totals.baseline,
+    flags: Object.values(per).reduce((a,g)=>a+g.flags.filter(f=>f.k==='bad').length,0),
+  };
+}
+
+// ---------- rendering -----------------------------------------------------
+let EDITING = false;
+
+function renderRail(){
+  const host = document.getElementById('travellers');
+  if (EDITING){
+    // Editing origin or home points at routes the pool may not contain, so the
+    // editor says plainly which ones are missing and what to run.
+    host.innerHTML = D.travellers.map(t=>{
+      const missing = [];
+      if (!D.flights.some(f=>f.role==='out' && f.group===t.key && f.origin===t.origin))
+        missing.push(t.origin+'→SGN');
+      if (!D.flights.some(f=>f.role==='home' && f.group===t.key && f.destination===t.home))
+        missing.push('PQC→'+t.home);
+      return '<div class="tedit"><div class="glabel">'+
+        '<span class="dot" style="background:'+t.hue+'"></span>'+esc(t.short)+'</div>'+
+        '<div class="tr"><label>from</label>'+
+          '<input class="code" maxlength="3" value="'+esc(t.origin)+'" data-te="'+t.key+'|origin">'+
+          '<label>home</label>'+
+          '<input class="code" maxlength="3" value="'+esc(t.home)+'" data-te="'+t.key+'|home"></div>'+
+        '<div class="tr"><label>adults</label>'+
+          '<input type="number" min="1" max="9" value="'+t.adults+'" data-te="'+t.key+'|adults">'+
+          '<label>kids</label>'+
+          '<input type="number" min="0" max="8" value="'+t.children+'" data-te="'+t.key+'|children"></div>'+
+        (missing.length?'<p class="note">no flights in the pool for '+esc(missing.join(', '))+
+          ' — rebuild the pool to fetch them</p>':'')+
+        '</div>';
+    }).join('')
+    + '<p class="sectitle" style="margin-top:14px">Dates to search</p>'
+    + Object.keys(ENVELOPE).map(k=>
+        '<div class="tedit"><div class="glabel">'+esc(ENVELOPE_LABELS[k])+'</div>'+
+        '<div class="tr"><label>from</label>'+
+          '<input type="date" value="'+ENVELOPE[k].from+'" data-env="'+k+'|from">'+
+        '</div><div class="tr"><label>to</label>'+
+          '<input type="date" value="'+ENVELOPE[k].to+'" data-env="'+k+'|to">'+
+        '</div></div>').join('')
+    + ((envelopeDirty() || travellersDirty())
+        ? '<p class="note">Changed. These only take effect once the pool is '
+          + 'rebuilt — export, then run <code>bundles --import</code> and '
+          + '<code>refresh-cloud</code>.</p>'
+        : '')
+    + '<button class="miniact" id="tdone" style="width:100%;margin-top:4px">Done editing</button>'
+    + '<button class="miniact" id="texport" style="width:100%;margin-top:4px">Download trip-config.json</button>';
+    return;
+  }
+  host.innerHTML = D.travellers.map(t=>
+    '<button class="travrow" type="button" data-t="'+t.key+'" aria-pressed="'+SHOWN.has(t.key)+'">'+
+    '<span class="dot" style="background:'+t.hue+'"></span><span style="min-width:0">'+
+    '<b>'+esc(t.short)+'</b><span>'+t.origin+' → SGN · home '+t.home+
+    ' · '+t.people+'p</span></span></button>').join('') +
+    '<button class="miniact" id="tedit" style="width:100%;margin-top:4px">Edit travellers</button>';
+
+  document.getElementById('spine').innerHTML = SHAPE.map((s,i)=>
+    '<div class="stop"><b>'+esc(s.label)+'</b>'+
+    '<div class="row"><label>nights</label>'+
+    '<input type="number" min="1" max="14" value="'+s.nights+'" data-spine="'+i+'" data-f="nights">'+
+    '<label>±</label>'+
+    '<input type="number" min="0" max="4" value="'+s.flex+'" data-spine="'+i+'" data-f="flex">'+
+    '</div></div>').join('');
+}
+
+function renderPool(){
+  const host = document.getElementById('pool');
+  const head = document.getElementById('poolhead');
+  if (!FOCUS){
+    head.innerHTML = 'Pick a slot in a bundle to see the flights that fit it.';
+    host.innerHTML = '<p class="empty">Click any <b>slot</b> in a bundle on the right — the flights that can fill it appear here, and you can drag them across.</p>'; return;
+  }
+  const t = TRAV[FOCUS.group];
+  const bundle = BUNDLES[ACTIVE];
+
+  // The date list depends on which slot you are filling, so it is rebuilt each
+  // time. A date that is no longer offered clears itself rather than silently
+  // filtering everything away.
+  const dates = [...new Set(poolFor(FOCUS.group, FOCUS.slot, bundle).map(e=>e.date))].sort();
+  if (FILTERS.date && !dates.includes(FILTERS.date)) FILTERS.date = '';
+  const sel = document.getElementById('f-date');
+  sel.innerHTML = '<option value="">any date</option>' +
+    dates.map(d=>'<option value="'+d+'"'+(d===FILTERS.date?' selected':'')+'>'+dmy(d)+'</option>').join('');
+
+  const rows = offersFor(FOCUS.group, FOCUS.slot, bundle);
+  // Google's own count, where we captured it, so a short list reads as "that
+  // is all there is" rather than "the collector missed some".
+  const reported = poolFor(FOCUS.group, FOCUS.slot, bundle)
+    .reduce((a,e)=>a + (e.reported_total||0), 0);
+  head.innerHTML = '<b>'+esc(t.short)+'</b> · '+esc(slotLabel(t, FOCUS.slot, bundle))+
+    ' · '+rows.length+' option'+(rows.length===1?'':'s')+
+    (reported ? ' <span class="tag">Google lists '+reported+
+      ' across these dates; only some carry a price</span>' : '')+
+    (FOCUS.slot==='domestic' ? ' <span class="tag">priced for all '+D.totals.people+'</span>' : '');
+
+  if (!rows.length){ host.innerHTML =
+    '<p class="empty">No flights in the dump for this slot. Widen the nights/flex on the left, '+
+    'relax the filters, or the route genuinely has nothing on those dates.</p>'; return; }
+
+  const cur = pickOf(bundle, FOCUS.group, FOCUS.slot);
+  host.innerHTML = rows.slice(0,80).map(({entry,o})=>{
+    const chosen = cur && cur.fingerprint===o.fingerprint && cur.poolId===entry.id;
+    const tags = [];
+    tags.push('<span class="tag">'+(o.stops?o.stops+' stop'+(o.stops>1?'s':''):'nonstop')+'</span>');
+    if (o.overnight) tags.push('<span class="tag warn">overnight</span>');
+    if (o.max_layover_min) tags.push('<span class="tag'+
+      (t.prefs.max_layover_min&&o.max_layover_min>t.prefs.max_layover_min?' bad':'')+
+      '">layover '+dur(o.max_layover_min)+'</span>');
+    if (o.bag_pp) tags.push('<span class="tag">+'+money(o.bag_pp)+' bag'+(o.bag_estimated?'*':'')+'</span>');
+    else tags.push('<span class="tag good">bag included</span>');
+    if (chosen) tags.push('<span class="tag good">in this bundle</span>');
+    const h = o.history;
+    if (h){
+      if (h.is_low) tags.push('<span class="tag good">lowest in '+h.n+' checks</span>');
+      else if (h.is_high) tags.push('<span class="tag bad">highest in '+h.n+' checks</span>');
+      else if (h.position != null) tags.push('<span class="tag'
+        + (h.position > 0.66 ? ' warn' : '') + '">'
+        + (h.position < 0.34 ? 'near its low' : h.position > 0.66 ? 'near its high' : 'mid-range')
+        + ' of ' + h.n + '</span>');
+      if (h.pct_since_prev && Math.abs(h.pct_since_prev) >= 2)
+        tags.push('<span class="tag '+(h.pct_since_prev<0?'good':'bad')+'">'
+          + (h.pct_since_prev<0?'▼ ':'▲ ')
+          + Math.abs(h.pct_since_prev).toFixed(0)+'% since last check</span>');
+    }
+    return '<div class="card" draggable="true" data-pool="'+esc(entry.id)+'" data-fp="'+esc(o.fingerprint)+'">'+
+      '<div class="top"><span class="air">'+esc(o.airline_label)+'</span>'+
+      '<span class="pr">'+money(o.pp_with_bag)+'<span style="font-weight:400;color:var(--text-muted)">/pp</span></span></div>'+
+      '<div class="mid">'+dmy(o.dep_iso)+' '+o.dep+' → '+o.arr+
+      (o.overnight?' <span style="color:var(--warning)">+1d</span>':'')+
+      ' · '+dur(o.duration_min)+' · '+esc(entry.route)+'</div>'+
+      '<div class="tags">'+tags.join('')+'</div></div>';
+  }).join('');
+}
+
+// What a bundle is measured against: another bundle you nominated, or the
+// September fares you already found.
+function referenceTotal(bundle){
+  if (BASELINE_ID && bundle.id !== BASELINE_ID){
+    const base = BUNDLES.find(x=>x.id===BASELINE_ID);
+    if (base) return analyse(base).total;
+  }
+  return D.totals.baseline;
+}
+
+function renderBundles(){
+  const host = document.getElementById('bundles');
+  host.innerHTML = BUNDLES.map((b,bi)=>{
+    const A = analyse(b);
+    const delta = A.total - referenceTotal(b);
+    const gs = D.travellers.filter(t=>SHOWN.has(t.key)).map(t=>{
+      const g = A.per[t.key];
+      const slots = SLOTS.filter(s=>!(s.key==='hop' && !(t.self_connect_via||[]).length))
+        .map(s=>{
+        const r = resolve(pickOf(b,t.key,s.key));
+        const focused = FOCUS && FOCUS.group===t.key && FOCUS.slot===s.key && bi===ACTIVE;
+        const cls = 'slot'+(r?' filled':'')+(focused?' focused':'');
+        const name = slotLabel(t, s.key, b);
+        // Only the shared SGN->PQC hop is meaningfully copyable to everyone:
+        // an outbound belongs to one traveller's home city.
+        const spread = (r && s.key === 'domestic')
+          ? '<span class="sx" data-all="'+t.key+'|'+s.key+'|'+bi+
+            '" title="Put this flight in everyone’s bundle">⇲ all</span>' : '';
+        const body = r
+          ? '<span class="sk">'+esc(name)+'</span><span class="sx" data-clear="'+
+            t.key+'|'+s.key+'|'+bi+'">×</span>'+spread+'<br><span class="sv">'+
+            esc(r.o.airline_label)+' · '+dmy(r.o.dep_iso)+' '+r.o.dep+'→'+r.o.arr+
+            (r.o.overnight?'+1':'')+' · '+money(r.o.pp_with_bag)+'/pp</span>'
+          : '<span class="sk">'+esc(name)+'</span><br><span class="sv">'+
+            esc(slotHint(t, s.key))+'</span>';
+        return '<button class="'+cls+'" type="button" data-slot="'+t.key+'|'+s.key+'|'+bi+'">'+body+'</button>';
+      }).join('');
+      const bad = g.flags.filter(f=>f.k==='bad'), warn = g.flags.filter(f=>f.k==='warn');
+      return '<div class="gblock"><div class="glabel">'+
+        '<span class="dot" style="background:'+t.hue+'"></span>'+esc(t.short)+
+        '<span class="hrs">'+(g.sgnH!=null?fmtH(g.sgnH)+' SGN':'')+
+        (g.pqcH!=null?' · '+fmtH(g.pqcH)+' PQC':'')+'</span></div>'+slots+
+        (bad.length?'<div class="tags">'+bad.map(f=>'<span class="tag bad">'+esc(f.t)+'</span>').join('')+'</div>':'')+
+        (warn.length?'<div class="tags">'+warn.map(f=>'<span class="tag warn">'+esc(f.t)+'</span>').join('')+'</div>':'')+
+        '</div>';
+    }).join('');
+    const isBase = BASELINE_ID === b.id;
+    // The nominated baseline bundle is itself measured against your September
+    // fares - saying just "baseline" there would read as measuring against
+    // itself.
+    const refName = (BASELINE_ID && !isBase)
+      ? (BUNDLES.find(x=>x.id===BASELINE_ID)||{}).name : 'Sep baseline';
+    return '<div class="bundle'+(bi===ACTIVE?' active':'')+'" data-bundle="'+bi+'">'+
+      '<div class="bhead"><input class="bname" value="'+esc(b.name)+'" data-rename="'+bi+'">'+
+      (isBase?'<span class="tag good">baseline</span>':'')+
+      '<button class="miniact" data-fill="'+bi+'" title="Replace with the cheapest coherent set">Auto-fill</button>'+
+      '<button class="miniact" data-dup="'+bi+'" title="Start a new bundle from this one">Copy</button>'+
+      '<button class="miniact" data-base="'+bi+'" title="Measure the other bundles against this one">'+
+        (isBase?'Unset base':'Set base')+'</button>'+
+      (BUNDLES.length>1?'<button class="miniact" data-del="'+bi+'" title="Delete">×</button>':'')+'</div>'+
+      '<div class="btot">'+money(A.total)+'</div>'+
+      (A.hotel ? '<div class="bsub" style="margin-bottom:6px">'
+        + money(A.flights)+' flights + '+money(A.hotel)+' hotel</div>' : '')+
+      '<div class="bsub">'+(A.complete
+        ? (delta===0 ? 'same as '+esc(refName)
+           : (delta<0?'▼ '+money(-delta)+' under ':'▲ '+money(delta)+' over ')+esc(refName))
+        : 'incomplete')+
+        ' · all '+D.totals.people+' travellers'+
+        (A.flags?' · <span style="color:var(--critical)">'+A.flags+' issue'+(A.flags>1?'s':'')+'</span>':'')+
+        '</div>'+gs+'</div>';
+  }).join('') + '<button class="miniact" id="addbundle" style="align-self:center">+ bundle</button>';
+}
+
+function renderTimeline(){
+  const b = BUNDLES[ACTIVE]; const A = analyse(b);
+  const host = document.getElementById('timeline');
+  document.getElementById('tlhead').textContent = 'Timeline — ' + b.name;
+
+  const segs = [];
+  D.travellers.filter(t=>SHOWN.has(t.key)).forEach(t=>{
+    const g = A.per[t.key], row = {t, bars:[]};
+    ['hop','out','domestic','home'].forEach(s=>{
+      const r = g.legs[s]; if (!r) return;
+      row.bars.push({a:T(r.o.dep_iso), b:T(r.o.arr_iso), cls:'transit',
+        label:r.entry.route+' '+r.o.dep});
+    });
+    if (g.sgnIn!=null && g.sgnOut>g.sgnIn)
+      row.bars.push({a:g.sgnIn, b:g.sgnOut, cls:'sgn', label:'SGN '+fmtH(g.sgnH)});
+    if (g.pqcIn!=null && g.pqcOut>g.pqcIn)
+      row.bars.push({a:g.pqcIn, b:g.pqcOut, cls:'pqc', label:'PQC '+fmtH(g.pqcH)});
+    segs.push(row);
+  });
+
+  const all = segs.flatMap(r=>r.bars);
+  if (!all.length){ host.innerHTML='<p class="empty">Fill a bundle to see the timeline.</p>'; return; }
+  const t0 = Math.min(...all.map(x=>x.a)), t1 = Math.max(...all.map(x=>x.b));
+  const span = Math.max(t1-t0, 1);
+  const pct = v => ((v-t0)/span*100);
+
+  // day ticks
+  const ticks = []; const d = new Date(t0); d.setHours(0,0,0,0);
+  for (let x=d.getTime(); x<=t1; x+=86400000){
+    if (x>=t0) ticks.push('<span class="tick" style="left:'+pct(x).toFixed(2)+'%">'+dmy(new Date(x).toISOString())+'</span>');
+  }
+
+  host.innerHTML =
+    '<div class="tlwrap"><div class="tl">'+
+    '<div class="tlaxis"><div></div><div class="ticks">'+ticks.join('')+'</div></div>'+
+    segs.map(r=>'<div class="tlrow"><div class="tlname">'+esc(r.t.short)+'</div>'+
+      '<div class="tltrack">'+r.bars.map(x=>{
+        const w = Math.max(pct(x.b)-pct(x.a), 0.4);
+        return '<div class="bar '+x.cls+'" style="left:'+pct(x.a).toFixed(2)+'%;width:'+w.toFixed(2)+
+          '%" title="'+esc(x.label)+'">'+(w>7?esc(x.label):'')+'</div>';
+      }).join('')+'</div></div>').join('')+
+    '</div></div>'+
+    '<div class="tlkey"><span><i style="background:var(--series-1)"></i>in Ho Chi Minh City</span>'+
+    '<span><i style="background:#1baf7a"></i>on Phu Quoc</span>'+
+    '<span><i style="background:var(--text-muted);opacity:.55"></i>in transit</span>'+
+    (A.together.sgn!=null?'<span>all '+D.totals.people+' together in SGN: <b>'+fmtH(A.together.sgn)+'</b></span>':'')+
+    (A.together.pqc!=null?'<span>together on PQC: <b>'+fmtH(A.together.pqc)+'</b></span>':'')+
+    '</div>';
+}
+
+// Cards rather than a table: this is the first thing on the page and the
+// question it answers is "which of these, and what does it cost me" - which
+// reads far better as a few big numbers than as a row of cells.
+function renderCompare(){
+  const rows = BUNDLES.map((b,i)=>({b, A:analyse(b), i}));
+  const complete = rows.filter(r=>r.A.complete);
+  const best = complete.length ? Math.min(...complete.map(r=>r.A.total)) : null;
+
+  document.getElementById('compare').innerHTML = '<div class="cmp">' + rows.map(({b,A,i})=>{
+    const d = A.total - referenceTotal(b);
+    // Only when it is the sole cheapest - tagging two identical bundles
+    // "cheapest" tells you nothing.
+    const isBest = A.complete && A.total === best && rows.length > 1
+      && complete.filter(r=>r.A.total === best).length === 1;
+    const baseBundle = BASELINE_ID ? BUNDLES.find(x=>x.id===BASELINE_ID) : null;
+    const ref = (BASELINE_ID && b.id !== BASELINE_ID && baseBundle)
+      ? baseBundle.name : 'Sep baseline';
+
+    const delta = !A.complete
+      ? '<span style="color:var(--warning)">incomplete</span>'
+      : d === 0 ? '<span style="color:var(--text-muted)">same as ' + esc(ref) + '</span>'
+      : '<span style="color:' + (d<0?'var(--good)':'var(--critical)') + '">'
+        + (d<0?'▼ ':'▲ ') + money(Math.abs(d)) + '</span>'
+        + '<span style="color:var(--text-muted)"> vs ' + esc(ref) + '</span>';
+
+    return '<button class="cmpcard'+(i===ACTIVE?' on':'')+(isBest?' best':'')+'" '
+      + 'data-pick="'+i+'" type="button">'
+      + '<span class="cmpname">'+esc(b.name)
+      + (b.id===BASELINE_ID?'<span class="tag good">base</span>':'')
+      + (isBest?'<span class="tag good">cheapest</span>':'')
+      + (A.flags?'<span class="tag bad">'+A.flags+' issue'+(A.flags>1?'s':'')+'</span>':'')
+      + '</span>'
+      + '<span class="cmptot">'+money(A.total)+'</span>'
+      + '<span class="cmpdelta">'+delta+'</span>'
+      + '<span class="cmpstats">'
+      +   '<span class="cmpstat"><b>'+fmtH(A.minSgn)+'</b>least in SGN</span>'
+      +   '<span class="cmpstat"><b>'+fmtH(A.minPqc)+'</b>least on PQC</span>'
+      +   '<span class="cmpstat"><b>'
+      +     (A.together.sgn!=null?fmtH(A.together.sgn):'--')+'</b>all together</span>'
+      + '</span></button>';
+  }).join('') + '</div>';
+}
+
+function renderAll(){ renderBundles(); renderPool(); renderTimeline(); renderCompare(); }
+
+// ---------- events --------------------------------------------------------
+document.getElementById('travellers').addEventListener('click', e=>{
+  if (e.target.id === 'tedit'){ EDITING = true; renderRail(); return; }
+  if (e.target.id === 'tdone'){ EDITING = false; renderRail(); renderAll(); return; }
+  if (e.target.id === 'texport'){
+    // Everything the collector needs to rebuild the pool around this trip.
+    const payload = {
+      saved_at: new Date().toISOString(),
+      travellers: D.travellers.map(t=>({
+        key:t.key, label:t.label, short:t.short, origin:t.origin, home:t.home,
+        adults:t.adults, children:t.children,
+      })),
+      dates: {
+        arrive:   {from: ENVELOPE.arrive.from,   to: ENVELOPE.arrive.to},
+        domestic: {from: ENVELOPE.domestic.from, to: ENVELOPE.domestic.to},
+        home:     {from: ENVELOPE.home.from,     to: ENVELOPE.home.to},
+      },
+      spine: SHAPE.map(s=>({code:s.code, nights:s.nights, flex:s.flex})),
+    };
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([JSON.stringify(payload,null,2)],
+      {type:'application/json'}));
+    a.download = 'trip-config.json'; a.click();
+    return;
+  }
+  const b = e.target.closest('[data-t]'); if(!b) return;
+  const k = b.dataset.t;
+  if (SHOWN.has(k)) SHOWN.delete(k); else SHOWN.add(k);
+  renderRail(); renderAll();
+});
+
+document.getElementById('travellers').addEventListener('input', e=>{
+  const env = e.target.dataset.env;
+  if (env){
+    const [key, edge] = env.split('|');
+    ENVELOPE[key][edge] = e.target.value;
+    save(); renderRail();
+    return;
+  }
+  const spec = e.target.dataset.te; if (!spec) return;
+  const [key, field] = spec.split('|');
+  const t = TRAV[key]; if (!t) return;
+  t[field] = (field === 'origin' || field === 'home')
+    ? e.target.value.trim().toUpperCase()
+    : Math.max(+e.target.value || 0, field === 'adults' ? 1 : 0);
+  t.people = t.adults + t.children;
+  save();
+  if (field === 'origin' || field === 'home'){
+    // Re-render the editor so the "no flights for this route" note appears or
+    // clears, keeping the caret where it was.
+    const pos = e.target.selectionStart;
+    renderRail();
+    const again = document.querySelector('[data-te="'+spec+'"]');
+    if (again){ again.focus(); try{ again.setSelectionRange(pos, pos); }catch(err){} }
+  }
+  renderAll();
+});
+document.getElementById('spine').addEventListener('input', e=>{
+  const i = e.target.dataset.spine; if (i==null) return;
+  SHAPE[+i][e.target.dataset.f] = +e.target.value;
+  save(); renderAll();
+});
+document.querySelectorAll('[data-filter]').forEach(el=>{
+  el.addEventListener('input', ()=>{
+    FILTERS[el.dataset.filter] = (el.type === 'checkbox') ? el.checked : el.value;
+    renderPool();
+  });
+});
+document.getElementById('fclear').addEventListener('click', ()=>{
+  ['date','maxStops','maxLayover','maxPrice','airline'].forEach(k=>{
+    FILTERS[k]=''; const el=document.querySelector('[data-filter="'+k+'"]'); if(el) el.value='';
+  });
+  FILTERS.fullService=false;
+  const fs=document.querySelector('[data-filter="fullService"]'); if(fs) fs.checked=false;
+  renderPool();
+});
+
+document.getElementById('bundles').addEventListener('click', e=>{
+  const slot = e.target.closest('[data-slot]');
+  const clear = e.target.closest('[data-clear]');
+  const all = e.target.closest('[data-all]');
+  const fill = e.target.closest('[data-fill]');
+  const dup = e.target.closest('[data-dup]');
+  const base = e.target.closest('[data-base]');
+  const del = e.target.closest('[data-del]');
+  const card = e.target.closest('[data-bundle]');
+  if (all){ const [g,s,bi]=all.dataset.all.split('|');
+    const n = applyToAll(BUNDLES[+bi], g, s);
+    renderAll(); return; }
+  if (dup){ duplicate(+dup.dataset.dup); renderAll(); return; }
+  if (base){ const b = BUNDLES[+base.dataset.base];
+    BASELINE_ID = (BASELINE_ID === b.id) ? null : b.id; save(); renderAll(); return; }
+  if (clear){ const [g,s,bi]=clear.dataset.clear.split('|');
+    delete BUNDLES[+bi].picks[g+'|'+s]; save(); renderAll(); return; }
+  if (fill){
+    ACTIVE = +fill.dataset.fill;
+    BUNDLES[ACTIVE].picks = {};
+    if (autofill(BUNDLES[ACTIVE]) === false)
+      alert('No coherent set of flights exists in the pool for these nights and '
+          + 'flex settings. Widen the flex on the left, or refresh the pool for '
+          + 'more dates.');
+    renderAll(); return;
+  }
+  if (del){ BUNDLES.splice(+del.dataset.del,1); ACTIVE=0; save(); renderAll(); return; }
+  if (slot){ const [g,s,bi]=slot.dataset.slot.split('|');
+    ACTIVE=+bi; FOCUS={group:g, slot:s}; renderAll(); return; }
+  if (card){ ACTIVE=+card.dataset.bundle; renderAll(); }
+});
+document.getElementById('bundles').addEventListener('change', e=>{
+  if (e.target.dataset.rename!=null){ BUNDLES[+e.target.dataset.rename].name=e.target.value; save(); renderCompare(); }
+});
+document.addEventListener('click', e=>{
+  if (e.target.id==='addbundle'){ BUNDLES.push(blank('Bundle '+(BUNDLES.length+1)));
+    ACTIVE=BUNDLES.length-1; save(); renderAll(); }
+});
+
+// Clicking a summary card focuses that bundle, so the timeline below it
+// switches to the one you are reading about.
+document.getElementById('compare').addEventListener('click', e=>{
+  const card = e.target.closest('[data-pick]');
+  if (!card) return;
+  ACTIVE = +card.dataset.pick;
+  renderAll();
+  document.getElementById('tlhead').scrollIntoView({block:'nearest', behavior:'smooth'});
+});
+
+// click a pool card to assign to the focused slot
+document.getElementById('pool').addEventListener('click', e=>{
+  const c = e.target.closest('[data-pool]'); if(!c || !FOCUS) return;
+  const entry = D.flights.find(f=>f.id===c.dataset.pool);
+  const offer = entry && entry.offers.find(o=>o.fingerprint===c.dataset.fp);
+  if (entry && offer) assign(BUNDLES[ACTIVE], FOCUS.group, FOCUS.slot, entry, offer);
+});
+
+// drag and drop
+let DRAG = null;
+document.getElementById('pool').addEventListener('dragstart', e=>{
+  const c = e.target.closest('[data-pool]'); if(!c) return;
+  DRAG = {poolId:c.dataset.pool, fp:c.dataset.fp};
+  c.classList.add('dragging'); e.dataTransfer.effectAllowed='copy';
+  e.dataTransfer.setData('text/plain', c.dataset.pool);
+  markValid(true);
+});
+document.getElementById('pool').addEventListener('dragend', e=>{
+  const c = e.target.closest('[data-pool]'); if(c) c.classList.remove('dragging');
+  DRAG=null; markValid(false);
+});
+function markValid(on){
+  document.querySelectorAll('[data-slot]').forEach(s=>{
+    s.classList.remove('valid','over');
+    if (!on || !DRAG) return;
+    const [g,slot,bi]=s.dataset.slot.split('|');
+    const entry = D.flights.find(f=>f.id===DRAG.poolId);
+    if (!entry) return;
+    const ok = offersFor(g, slot, BUNDLES[+bi]).some(r=>r.entry.id===entry.id);
+    if (ok) s.classList.add('valid');
+  });
+}
+document.getElementById('bundles').addEventListener('dragover', e=>{
+  const s = e.target.closest('[data-slot]'); if(!s || !s.classList.contains('valid')) return;
+  e.preventDefault(); s.classList.add('over');
+});
+document.getElementById('bundles').addEventListener('dragleave', e=>{
+  const s = e.target.closest('[data-slot]'); if(s) s.classList.remove('over');
+});
+document.getElementById('bundles').addEventListener('drop', e=>{
+  const s = e.target.closest('[data-slot]'); if(!s || !DRAG) return;
+  e.preventDefault();
+  const [g,slot,bi]=s.dataset.slot.split('|');
+  const entry = D.flights.find(f=>f.id===DRAG.poolId);
+  const offer = entry && entry.offers.find(o=>o.fingerprint===DRAG.fp);
+  if (entry && offer){ ACTIVE=+bi; FOCUS={group:g,slot:slot}; assign(BUNDLES[+bi], g, slot, entry, offer); }
+  DRAG=null; markValid(false);
+});
+
+// Everything the alert job needs: the picks, plus the price each flight was
+// at when you chose it, so it can say "since you chose this" rather than only
+// "since the last check".
+function bundlePayload(){
+  const out = BUNDLES.map(b=>{
+    const A = analyse(b);
+    const picks = {};
+    Object.keys(b.picks).forEach(k=>{
+      const p = b.picks[k], r = resolve(p);
+      picks[k] = Object.assign({}, p, r ? {
+        saved_pp: r.o.pp_with_bag, saved_total: r.o.price_total,
+        airline: r.o.airline_label, dep_iso: r.o.dep_iso, arr_iso: r.o.arr_iso,
+        stops: r.o.stops,
+      } : {missing:true});
+    });
+    return {id:b.id, name:b.name, baseline:b.id===BASELINE_ID,
+            total_at_save:A.total, complete:A.complete, picks};
+  });
+  return {
+    saved_at: new Date().toISOString(), currency: CUR,
+    shape: SHAPE, travellers: travEdits(), bundles: out,
+    trip_config: {
+      saved_at: new Date().toISOString(),
+      travellers: D.travellers.map(t=>({
+        key:t.key, label:t.label, short:t.short, origin:t.origin, home:t.home,
+        adults:t.adults, children:t.children})),
+      dates: {
+        arrive:   {from: ENVELOPE.arrive.from,   to: ENVELOPE.arrive.to},
+        domestic: {from: ENVELOPE.domestic.from, to: ENVELOPE.domestic.to},
+        home:     {from: ENVELOPE.home.from,     to: ENVELOPE.home.to},
+      },
+      spine: SHAPE.map(s=>({code:s.code, nights:s.nights, flex:s.flex})),
+    },
+  };
+}
+
+document.getElementById('export').addEventListener('click', ()=>{
+  const blob = new Blob([JSON.stringify(bundlePayload(), null, 2)],
+    {type:'application/json'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob); a.download = 'bundles.json'; a.click();
+  setStatus('downloaded — run `flights.py bundles --import --push` to use it');
+});
+document.getElementById('reseed').addEventListener('click', ()=>{
+  if (!confirm('Replace all bundles with a fresh auto-filled pair?')) return;
+  seed(); renderAll();
+});
+
+// Seed a cheapest bundle and a copy of it, and make the cheapest the thing the
+// others are measured against. Starting from a filled board and editing beats
+// starting from an empty grid of 12 slots.
+function seed(){
+  BUNDLES = [blank('Cheapest')];
+  autofill(BUNDLES[0]);
+  duplicate(0);
+  BUNDLES[1].name = 'Variant';
+  BASELINE_ID = BUNDLES[0].id;
+  ACTIVE = 1;
+  save();
+}
+
+// ---------- live actions (only when served by flights.py serve) ----------
+// Opened as a file, the page is sandboxed and cannot run anything locally, so
+// the buttons say what to type instead of pretending to work.
+// Live when something can act on the buttons: the laptop's server, or the
+// phone app's Plan tab, which hands over its own writer (window.__planApi)
+// and has no server behind it at all.
+const LIVE = !!window.__planApi || location.protocol.startsWith('http');
+
+async function post(action, body){
+  if (window.__planApi) return window.__planApi(action, body);
+  const res = await fetch('/api/' + action, {
+    method: 'POST',
+    headers: body ? {'X-Planner': '1', 'Content-Type': 'application/json'}
+                  : {'X-Planner': '1'},
+    body: body ? JSON.stringify(body) : undefined,
+  });
+  return res.json();
+}
+
+function setStatus(msg, kind){
+  const el = document.getElementById('livestatus');
+  if (!el) return;
+  el.textContent = msg || '';
+  el.style.color = kind === 'bad' ? 'var(--critical)'
+                 : kind === 'good' ? 'var(--good)' : 'var(--text-muted)';
+}
+
+async function act(action, button, label){
+  if (!LIVE){
+    setStatus('Open the planner with `python flights.py serve` to use this, '
+            + 'or run `python flights.py ' + action + '` yourself.', 'bad');
+    return;
+  }
+  const was = button.textContent;
+  button.textContent = label; button.disabled = true;
+  setStatus('working…');
+  try{
+    const data = await post(action);
+    if (!data.ok){ setStatus(data.output || 'failed', 'bad'); return; }
+    if (action === 'sync'){
+      if (window.__planApi) return;     // the app reloads this frame itself
+      // The pool is embedded at render time, so the page has to reload to
+      // pick up what sync just rebuilt.
+      setStatus('synced — reloading…', 'good');
+      setTimeout(()=>location.reload(), 600);
+      return;
+    }
+    const n = (data.stale || []).length;
+    setStatus(action === 'rebuild'
+      ? 'rebuild started in the cloud — it takes ~8 min, then press Sync'
+      : (n ? n + ' pick(s) no longer offered' : 'done'), n ? 'bad' : 'good');
+  }catch(err){
+    setStatus('could not reach the local server: ' + err.message, 'bad');
+  }finally{
+    button.textContent = was; button.disabled = false;
+  }
+}
+
+document.getElementById('act-save').addEventListener('click', async e=>{
+  const btn = e.currentTarget;
+  if (!LIVE){
+    setStatus('Not served — use Download instead, then '
+            + '`flights.py bundles --import --push`.', 'bad');
+    return;
+  }
+  const was = btn.textContent;
+  btn.textContent = 'saving…'; btn.disabled = true;
+  setStatus('saving and pushing…');
+  try{
+    const data = await post('save-bundles', bundlePayload());
+    if (!data.ok){ setStatus(data.output || 'failed', 'bad'); return; }
+    const n = (data.stale || []).length;
+    setStatus(n ? 'saved — but ' + n + ' pick(s) are no longer offered'
+                : 'saved and pushed — the cloud is watching these picks',
+              n ? 'bad' : 'good');
+  }catch(err){
+    setStatus('could not reach the local server: ' + err.message, 'bad');
+  }finally{
+    btn.textContent = was; btn.disabled = false;
+  }
+});
+
+['sync','rebuild'].forEach(action=>{
+  const btn = document.getElementById('act-' + action);
+  if (!btn) return;
+  btn.addEventListener('click', ()=> act(action, btn,
+    action === 'sync' ? 'syncing…' :
+    action === 'rebuild' ? 'starting…' : 'importing…'));
+});
+
+if (!LIVE) setStatus('Static file — run `python flights.py serve` for live buttons.');
+
+// ---------- boot ----------------------------------------------------------
+if (!load()) seed();
+renderRail(); renderAll();
+</script>
+</body></html>
