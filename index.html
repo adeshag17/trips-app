@@ -15,14 +15,14 @@
   --bg:#f6f7f9; --card:#fff; --ink:#15181d; --dim:#687180; --line:#e3e6ea;
   --accent:#1f6feb; --ok:#127c4a; --okbg:#e7f6ee; --warn:#8a5a00;
   --warnbg:#fdf3dc; --bad:#a3252b; --badbg:#fdeaea; --chip:#eef1f5;
-  --ghost:#b9c0c9; --hotel:#cfe0f5;
+  --ghost:#b9c0c9; --hotel:#cfe0f5; --hotelbar:#7a5bd1;
 }
 @media (prefers-color-scheme:dark){
   :root:not([data-theme=light]){
     --bg:#15171a; --card:#1d2024; --ink:#e8eaed; --dim:#9aa3af; --line:#2c3137;
     --accent:#6ea8ff; --ok:#6fd49b; --okbg:#14321f; --warn:#e0b355;
     --warnbg:#332814; --bad:#ff8f8f; --badbg:#3a1c1e; --chip:#262a2f;
-    --ghost:#4d555f; --hotel:#1e3049;
+    --ghost:#4d555f; --hotel:#1e3049; --hotelbar:#7a5bd1;
   }
 }
 *{box-sizing:border-box}
@@ -221,7 +221,11 @@ footer{color:var(--dim);font-size:12px;margin-top:26px;line-height:1.6}
 .cell.empty{background:transparent}
 .cell.merged{background:color-mix(in srgb,var(--chip) 70%,transparent);
   border:1px solid var(--line)}
-.cell.hotel{box-shadow:inset 0 0 0 2px var(--hotel)}
+.cell.hotelcell{background:color-mix(in srgb,var(--hotelbar) 14%,transparent)}
+.hchip{font-size:10px;line-height:1.4;border-radius:3px;padding:2px 5px;color:#fff;
+  background:var(--hotelbar);cursor:pointer;display:flex;min-width:0}
+.hchip .t{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.hchip:hover{outline:2px solid var(--ink);outline-offset:1px}
 .chip{font-size:10px;line-height:1.4;border-radius:3px;padding:1px 4px;
   color:#fff;cursor:pointer;display:flex;align-items:center;gap:3px;
   min-width:0}
@@ -273,8 +277,7 @@ footer{color:var(--dim);font-size:12px;margin-top:26px;line-height:1.6}
 .blk.ghost{background:transparent;border:1.5px dashed var(--ghost);
   color:var(--dim);line-height:19px;cursor:default}
 .blk:hover{outline:2px solid var(--ink);outline-offset:1px;z-index:5}
-.hotelband{position:absolute;top:0;bottom:0;background:var(--hotel);
-  border-radius:4px;opacity:.55}
+.blk.hotel{background:var(--hotelbar);padding:0 6px;text-overflow:ellipsis}
 .brk{position:absolute;top:0;bottom:0;background:
   repeating-linear-gradient(135deg,transparent,transparent 4px,
   color-mix(in srgb,var(--dim) 18%,transparent) 4px,
@@ -937,8 +940,6 @@ function renderDays(tl){
       while (ri + span < cells.length && cells[ri+span].sig === cells[ri].sig
              && cells[ri].sig !== '-') span++;
       const cell = cells[ri];
-      const inHotel = tl.hotel && T(tl.hotel.start) < z && T(tl.hotel.end) > a
-        && tl.rows.slice(ri, ri+span).every(r => r.inHotel);
       let inner = '';
       if (cell.kind === 'fly'){
         inner = cell.flights.map(f => {
@@ -954,12 +955,37 @@ function renderDays(tl){
         inner = `<div class="place" data-tip="${esc(cell.detail)}">${esc(cell.place)}</div>`;
       }
       h += `<div class="cell${cell.kind==='none'?' empty':''}`
-         + `${span>1?' merged':''}${inHotel?' hotel':''}" `
+         + `${span>1?' merged':''}" `
          + `style="grid-column:${ci+2};grid-row:${ri+2} / span ${span}">${inner}</div>`;
       ri += span;
     }
   });
+  h += hotelRow(tl, cols, tl.rows.length + 2);
   return h + `</div>` + legend(true);
+}
+
+// Booked hotels as a row of their own under the travellers, one bar per
+// stay across the days it covers - as on the Plan tab's timeline.
+function hotelRow(tl, cols, row){
+  const hotels = tl.hotels || [];
+  if (!hotels.length) return '';
+  let h = `<div class="nm" style="grid-row:${row};align-self:center"><b>Hotels</b></div>`;
+  let ci = 0;
+  while (ci < cols.length){
+    const at = c => hotels.filter(x => T(x.start) < c.days[c.days.length-1] + DAY
+                                     && T(x.end) > c.days[0]);
+    const here = at(cols[ci]), sig = here.map(x => x.booking + x.start).join('|');
+    let span = 1;
+    while (sig && ci + span < cols.length
+           && at(cols[ci+span]).map(x => x.booking + x.start).join('|') === sig) span++;
+    const inner = here.map(x => `<div class="hchip" data-tip="${esc(x.detail)}"`
+      + (x.booking ? ` data-open="${esc(x.vendor)}|${esc(x.booking)}"` : '')
+      + `><span class="t">${esc(x.label)}</span></div>`).join('');
+    h += `<div class="cell${here.length ? ' hotelcell' : ' empty'}" `
+       + `style="grid-column:${ci+2} / span ${span};grid-row:${row}">${inner}</div>`;
+    ci += span;
+  }
+  return h;
 }
 
 function legend(grid){
@@ -968,7 +994,7 @@ function legend(grid){
     + (grid ? '' : `<i style="background:#9aa3af"></i>connection`)
     + `<i style="background:var(--ok)"></i>${grid?'staying put':'on the ground'}`
     + `<i style="border:1.2px dashed var(--ghost)"></i>not booked`
-    + `<i style="background:var(--hotel)"></i>hotel`
+    + `<i style="background:var(--hotelbar)"></i>hotel`
     + `<span class="warnico" style="margin-left:14px">!</span> terminal change`
     + `</div>`;
 }
@@ -1055,11 +1081,6 @@ function renderBroken(tl, width){
         + `<div class="guides">${guides}</div>`;
   tl.rows.forEach(r => {
     let blocks = '';
-    if (tl.hotel && r.inHotel){
-      const a = x(T(tl.hotel.start)), b = x(T(tl.hotel.end));
-      blocks += `<div class="hotelband" style="left:${a}px;width:${Math.max(b-a,2)}px"
-        data-tip="${esc(tl.hotel.label)}"></div>`;
-    }
     dead.forEach(([a]) =>
       blocks += `<div class="brk" style="left:${x(a)}px;width:${stub}px"></div>`);
     r.blocks.forEach(b => {
@@ -1083,6 +1104,19 @@ function renderBroken(tl, width){
        + (r.count > 1 ? ` <span class="n">×${r.count}</span>` : '')
        + `</div><div class="track">${blocks}</div></div>`;
   });
+  if ((tl.hotels || []).length){
+    let blocks = '';
+    dead.forEach(([a]) =>
+      blocks += `<div class="brk" style="left:${x(a)}px;width:${stub}px"></div>`);
+    tl.hotels.forEach(hb => {
+      const a = x(T(hb.start)), z = x(T(hb.end)), w = Math.max(z-a, 4);
+      blocks += `<div class="blk hotel" style="left:${a}px;width:${w}px"`
+        + (hb.booking ? ` data-open="${esc(hb.vendor)}|${esc(hb.booking)}"` : '')
+        + ` data-tip="${esc(hb.detail)}">${w > 30 ? esc(hb.label) : ''}</div>`;
+    });
+    h += `<div class="brow"><div class="nm"><b>Hotels</b></div>`
+       + `<div class="track">${blocks}</div></div>`;
+  }
   return h + `</div>` + legend(false);
 }
 
@@ -1539,7 +1573,7 @@ if (D) render();
 // page before the network is consulted at all.
 // ---------------------------------------------------------------------------
 
-const CFG = {"owner":"adeshag17","repo":"vietnam-flights","ref":"master","workflow":"sync-mail.yml","payload":"data/trips-payload.json","review":"data/review-payload.json","prices":"data/prices-payload.json","pool":"data/flights.json","bundles":"data/bundles.json","pricecheck":"check-flights.yml","shell":"27"};
+const CFG = {"owner":"adeshag17","repo":"vietnam-flights","ref":"master","workflow":"sync-mail.yml","payload":"data/trips-payload.json","review":"data/review-payload.json","prices":"data/prices-payload.json","pool":"data/flights.json","bundles":"data/bundles.json","pricecheck":"check-flights.yml","shell":"28"};
 
 const K = {token: 'ft.token', data: 'ft.payload', at: 'ft.payload.at',
            etag: 'ft.payload.etag'};
