@@ -476,6 +476,39 @@ footer{color:var(--dim);font-size:12px;margin-top:26px;line-height:1.6}
 .pedit .linkbtn{color:var(--dim)}
 .pfoot{display:flex;gap:10px;align-items:center;margin-top:24px}
 .planed .small{font-size:12px;margin-top:8px}
+
+/* The board, inside the plan view. */
+.board{margin-top:18px}
+.bchips{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:8px}
+.bchip{font:inherit;font-size:13px;padding:6px 12px;border-radius:9px;cursor:pointer;
+  background:none;color:inherit;border:1px solid var(--line)}
+.bchip.on{background:#1b2a47;border-color:#2c4877;color:#cfe3ff}
+.btotal{margin:6px 0 12px;font-size:15px}
+.brow{border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin:8px 0}
+.brow.fixed{opacity:.85}
+.brow.open,.brow.part{border-color:#2c4877}
+.bleg{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+.bleg .pill{font-size:11px}
+.bticket{font-size:12.5px;margin-top:6px;color:var(--dim)}
+.bticket b{color:inherit}
+.bticket.struck{text-decoration:line-through;opacity:.6}
+.bopts{display:grid;gap:4px;margin-top:8px}
+.bopt{display:grid;grid-template-columns:20px 64px 1fr auto;gap:8px;align-items:center;
+  padding:6px 8px;border-radius:8px;cursor:pointer;font-size:13px}
+.bopt:hover{background:#ffffff08}
+.bopt.on{background:#1b2a47}
+.bopt input{width:auto}
+.bopt .num{text-align:right;white-space:nowrap}
+.timeline{display:grid;gap:8px}
+.tline{display:flex;flex-wrap:wrap;gap:6px;align-items:center;font-size:12.5px}
+.tline > b{min-width:90px}
+.tstep{border:1px solid var(--line);border-radius:7px;padding:3px 8px}
+.tstep.booked{border-color:#3d6b40}
+.tstep.picked{border-color:#2c4877;background:#1b2a4766}
+.tstep.open{border-style:dashed;color:var(--dim)}
+.tstay{color:var(--dim);font-size:11.5px}
+.pdetails{margin-top:22px;border-top:1px solid var(--line);padding-top:10px}
+.pdetails summary{cursor:pointer;font-weight:600;font-size:14px}
 </style>
 </head><body>
 <div id="appbar" class="appbar"><span class="as">Starting…</span></div>
@@ -1418,7 +1451,7 @@ if (D) render();
 // page before the network is consulted at all.
 // ---------------------------------------------------------------------------
 
-const CFG = {"owner":"adeshag17","repo":"vietnam-flights","ref":"master","workflow":"sync-mail.yml","payload":"data/trips-payload.json","review":"data/review-payload.json","prices":"data/prices-payload.json","pool":"data/flights.json","bundles":"data/bundles.json","shell":"23"};
+const CFG = {"owner":"adeshag17","repo":"vietnam-flights","ref":"master","workflow":"sync-mail.yml","payload":"data/trips-payload.json","review":"data/review-payload.json","prices":"data/prices-payload.json","pool":"data/flights.json","bundles":"data/bundles.json","shell":"24"};
 
 const K = {token: 'ft.token', data: 'ft.payload', at: 'ft.payload.at',
            etag: 'ft.payload.etag'};
@@ -2486,6 +2519,8 @@ async function openPlan() {
       return;
     }
   }
+  // The board needs the fares the price check found for each open leg.
+  if (!PRICES) PRICES = await fetchData(CFG.prices, 'ft.prices');
   if (!EDIT) EDIT = clone(PLANS[0] || blankPlan());
   renderEditor();
 }
@@ -2532,12 +2567,15 @@ function renderEditor() {
       <button class="refresh" id="pl-new">+ New plan</button>
       <button class="refresh ghostbtn" id="pl-copy" ${p.id ? '' : 'disabled'}>Copy</button>
       <span class="sp"></span>
-      ${p.id === 'vietnam-dec-2026'
-        ? '<a href="#" id="pl-board" class="refresh ghostbtn">Open the Vietnam board</a>' : ''}
     </div>
     <label class="pname"><span>Name</span>
       <input id="pl-name" value="${esc(p.name)}"></label>
 
+    ${renderBoard(p)}
+
+    <details class="pdetails" ${p.legs.length ? '' : 'open'}
+             ${EDIT_DETAILS_OPEN ? 'open' : ''}>
+    <summary>Travellers and legs</summary>
     <h3>Travellers <small>each traveller is booked as one ticket group</small></h3>
     <table class="pedit"><thead><tr><th>Who</th><th>Adults</th><th>Children</th><th></th></tr></thead>
       <tbody>${trav}</tbody></table>
@@ -2549,6 +2587,7 @@ function renderEditor() {
       <tbody>${legs}</tbody></table>
     <button class="linkbtn" id="pl-addleg">+ Add leg</button>
     <datalist id="airports">${airports}</datalist>
+    </details>
 
     <div class="pfoot">
       <span id="pl-msg" class="dim">${EDIT_DIRTY ? 'Unsaved changes.' : ''}</span>
@@ -2646,7 +2685,9 @@ function wireEditor() {
     EDIT = copy; EDIT_DIRTY = true;
     renderEditor();
   };
-  if ($('#pl-board')) $('#pl-board').onclick = e => { e.preventDefault(); openBoard(); };
+  wireBoard(host, dirty);
+  const details = host.querySelector('.pdetails');
+  if (details) details.addEventListener('toggle', () => { EDIT_DETAILS_OPEN = details.open; });
 
   $('#pl-addtrav').onclick = () => {
     collectEditor();
@@ -2720,6 +2761,263 @@ function wireEditor() {
     EDIT = clone(PLANS[0] || blankPlan());
     EDIT_DIRTY = false;
     renderEditor();
+  };
+}
+</script>
+<script>// ---------------------------------------------------------------------------
+// The board: booked legs fixed, the rest chosen.
+//
+// What is already booked comes in fixed - the actual ticket, from the trips
+// data - and only the legs still to book are chosen, from the fares the
+// price check found for them. A fixed leg can be taken off "fixed" to see
+// what replacing it would cost; it is then priced like an open leg at the
+// next check. Bundles are alternative sets of choices, compared on what the
+// whole trip comes to: what has been paid, plus what is picked.
+//
+// Drawn inside the plan view (plans.js), so a plan and its board are one
+// page: change a leg above, see what it does to the board below.
+// ---------------------------------------------------------------------------
+
+let ACTIVE_BUNDLE = 0;
+let EDIT_DETAILS_OPEN = false;
+
+const sig = o => `${o.date}|${o.airline}|${o.dep}`;
+const dayMonth = iso => iso ? new Date(iso.slice(0, 10) + 'T00:00:00')
+  .toLocaleDateString('en-GB', {day: 'numeric', month: 'short'}) : '';
+const hhmm = iso => (iso || '').slice(11, 16);
+
+function boardRows(p) {
+  const trips = (typeof D !== 'undefined' && D && D.trips) || [];
+  const trip = trips.find(t => t.plan_id === p.id);
+  const expanded = trip ? trip.legs : [];
+  const section = ((PRICES && PRICES.plans) || []).find(s => s.plan_id === p.id);
+  const unfixed = new Set(p.unfixed || []);
+  const people = Object.fromEntries(p.travellers.map(t =>
+    [t.key, (t.adults || 0) + (t.children || 0) || 1]));
+  // Matched by route and traveller, not by leg name. The trips data is built
+  // in the cloud from the plan as it was at the last sync, so right after
+  // the plan is edited its leg names can differ - SGN-PQC merged into one
+  // leg for three groups showed two of them as unbooked. A ticket for that
+  // traveller on that route is that leg, however the plan names it.
+  const sameRoute = (x, l) => x.origin === l.from && x.destination === l.to;
+  return p.legs.map(l => {
+    const booked = [];
+    (l.who || []).forEach(k => {
+      const got = expanded.find(x => sameRoute(x, l) && x.group === k && x.booked);
+      if (got) booked.push(got);
+    });
+    const isUnfixed = unfixed.has(l.key);
+    const needs = (l.who || []).filter(k =>
+      isUnfixed || !booked.some(x => x.group === k));
+    const legs = section ? section.legs : [];
+    const priced = legs.find(x => x.plan_leg === l.key)
+      || legs.find(x => x.origin === l.from && x.destination === l.to);
+    return {leg: l, booked, needs, unfixed: isUnfixed,
+            seats: needs.reduce((n, k) => n + (people[k] || 1), 0),
+            options: (priced && priced.options) || []};
+  });
+}
+
+function bundlesOf(p, rows) {
+  if (!p.bundles || !p.bundles.length)
+    p.bundles = [{id: 'b' + Date.now(), name: 'Cheapest', picks: {}}];
+  if (ACTIVE_BUNDLE >= p.bundles.length) ACTIVE_BUNDLE = 0;
+  // A bundle starts from the cheapest fare on any leg it has not chosen.
+  p.bundles.forEach(b => rows.forEach(r => {
+    if (r.needs.length && r.options.length && !b.picks[r.leg.key])
+      b.picks[r.leg.key] = sig(r.options[0]);
+  }));
+  return p.bundles;
+}
+
+function totals(rows, b) {
+  const paidFor = new Set();
+  let paid = 0, picked = 0, unpicked = 0;
+  rows.forEach(r => {
+    r.booked.forEach(x => {
+      if (paidFor.has(x.booked.booking_id)) return;   // one ticket, several legs
+      paidFor.add(x.booked.booking_id);
+      paid += inr(x.booked.paid, x.booked.currency);
+    });
+    if (!r.needs.length) return;
+    const o = r.options.find(o => sig(o) === b.picks[r.leg.key]);
+    if (o) picked += o.pp * r.seats; else unpicked++;
+  });
+  return {paid, picked, total: paid + picked, unpicked};
+}
+
+function travellerNames(p, keys) {
+  return keys.map(k => (p.travellers.find(t => t.key === k) || {label: k}).label)
+    .join(', ');
+}
+
+function renderBoard(p) {
+  if (!p.legs.length) return '';
+  const rows = boardRows(p);
+  const bundles = bundlesOf(p, rows);
+  const active = bundles[ACTIVE_BUNDLE];
+
+  const chips = bundles.map((b, i) => {
+    const t = totals(rows, b);
+    return `<button class="bchip ${i === ACTIVE_BUNDLE ? 'on' : ''}" data-bundle="${i}">
+      <b>${esc(b.name)}</b> ${rupees(t.total)}
+      ${t.unpicked ? `<span class="dim">· ${t.unpicked} unpriced</span>` : ''}</button>`;
+  }).join('');
+  const t = totals(rows, active);
+  const body = rows.map((r, i) => renderBoardRow(p, r, i, active)).join('');
+
+  return `<section class="board">
+    <h3>Board <small>booked legs are fixed; choose the rest</small></h3>
+    <div class="bchips">${chips}
+      <button class="linkbtn" id="b-new">+ Bundle</button>
+      <button class="linkbtn" id="b-rename">Rename</button>
+      ${bundles.length > 1 ? '<button class="linkbtn" id="b-del">Remove</button>' : ''}
+    </div>
+    <p class="btotal">${esc(active.name)}: <b>${rupees(t.total)}</b>
+      <span class="dim">= ${rupees(t.paid)} paid + ${rupees(t.picked)} to book${
+        t.unpicked ? ` · ${t.unpicked} leg(s) without fares yet` : ''}</span></p>
+    ${body}
+    ${renderTimeline(p, rows, active)}
+  </section>`;
+}
+
+function renderBoardRow(p, r, i, active) {
+  const l = r.leg;
+  const d = (l.dates || []).slice().sort();
+  const span = d.length > 1 ? `${dayMonth(d[0])}–${dayMonth(d[d.length - 1])}`
+                            : dayMonth(d[0]);
+  // One line per ticket, with everyone on it - a booking for four is one
+  // ticket, not four.
+  const byTicket = new Map();
+  r.booked.forEach(x => {
+    const t = byTicket.get(x.booked.booking_id) || {b: x.booked, who: []};
+    t.who.push(x.label);
+    byTicket.set(x.booked.booking_id, t);
+  });
+  const tickets = [...byTicket.values()].map(({b, who}) =>
+    `<div class="bticket ${r.unfixed ? 'struck' : ''}">
+      <span title="Booked">🔒</span> <b>${esc(b.airline)} ${esc(b.flight_no)}</b>
+      · ${dayMonth(b.depart)} ${hhmm(b.depart)}–${hhmm(b.arrive)}
+      · ${esc(who.join(', '))} · <code>${esc(b.pnr || '')}</code></div>`).join('');
+  const toggle = r.booked.length
+    ? `<button class="linkbtn" data-unfix="${esc(l.key)}"
+         title="${r.unfixed ? 'Treat the booked ticket as fixed again'
+                            : 'Price this leg as if it were open, to compare'}">${
+         r.unfixed ? 'fix again' : 'unfix'}</button>` : '';
+
+  let choice = '';
+  if (r.needs.length) {
+    choice = r.options.length
+      ? `<div class="bopts">${r.options.map(o => {
+          const s = sig(o), on = active.picks[l.key] === s;
+          return `<label class="bopt ${on ? 'on' : ''}">
+            <input type="radio" name="pick-${i}" data-pick="${esc(l.key)}"
+              value="${esc(s)}" ${on ? 'checked' : ''}>
+            <span class="bdate">${dayMonth(o.date)}</span>
+            <span class="bair">${esc(o.airline)} <span class="dim">${esc(o.dep)}–${esc(o.arr)}
+              · ${o.stops ? o.stops + ' stop' : 'nonstop'}</span></span>
+            <span class="num">${rupees(o.pp)}${r.seats > 1
+              ? ` <span class="dim">× ${r.seats} = ${rupees(o.pp * r.seats)}</span>` : ''}</span>
+          </label>`;
+        }).join('')}</div>`
+      : `<p class="dim small">No fares yet — ${r.unfixed ? 'an unfixed leg'
+          : 'this leg'} is priced at the next price check.</p>`;
+  }
+
+  const state = !r.needs.length ? 'fixed'
+              : r.booked.length && !r.unfixed ? 'part' : 'open';
+  return `<div class="brow ${state}">
+    <div class="bleg"><b>${esc(l.from)} → ${esc(l.to)}</b>
+      <span class="dim">${esc(travellerNames(p, l.who || []))} · ${span}</span>
+      ${state === 'fixed' ? '<span class="pill ok">booked</span>' : ''}
+      ${r.unfixed ? '<span class="pill open">unfixed</span>' : ''}
+      ${state === 'part' ? `<span class="pill open">to book for ${
+        esc(travellerNames(p, r.needs))}</span>` : ''}
+      ${toggle}</div>
+    ${tickets}${choice}
+  </div>`;
+}
+
+// Each traveller's journey: booked flights, then the bundle's picks, in
+// order, with how long they stay between.
+function renderTimeline(p, rows, bundle) {
+  const lines = p.travellers.map(tr => {
+    const steps = [];
+    rows.forEach(r => {
+      if (!(r.leg.who || []).includes(tr.key)) return;
+      const b = r.booked.find(x => x.group === tr.key);
+      if (b && !r.unfixed) {
+        steps.push({at: b.booked.depart, end: b.booked.arrive, from: r.leg.from,
+                    to: r.leg.to, what: `${b.booked.airline} ${b.booked.flight_no}`,
+                    kind: 'booked'});
+        return;
+      }
+      const o = r.options.find(o => sig(o) === bundle.picks[r.leg.key]);
+      steps.push(o
+        ? {at: `${o.date}T${o.dep}`, end: '', from: r.leg.from, to: r.leg.to,
+           what: o.airline, kind: 'picked'}
+        : {at: (r.leg.dates || [])[0] || '', end: '', from: r.leg.from,
+           to: r.leg.to, what: 'not chosen', kind: 'open'});
+    });
+    steps.sort((a, b) => a.at.localeCompare(b.at));
+    const parts = [];
+    steps.forEach((s, i) => {
+      parts.push(`<span class="tstep ${s.kind}">${esc(s.from)}→${esc(s.to)}
+        ${dayMonth(s.at)}${s.at.length > 10 ? ' ' + hhmm(s.at) : ''}
+        <span class="dim">${esc(s.what)}</span></span>`);
+      const next = steps[i + 1];
+      if (!next) return;
+      const from = (s.end || s.at).slice(0, 10), to = next.at.slice(0, 10);
+      const nights = Math.round((new Date(to) - new Date(from)) / 86400000);
+      if (nights > 0)
+        parts.push(`<span class="tstay">${nights} night${nights > 1 ? 's' : ''} in
+          ${esc(((typeof D !== 'undefined' && D && D.airports) || {})[s.to] || s.to)}</span>`);
+    });
+    return `<div class="tline"><b>${esc(tr.label)}</b>${parts.join('')}</div>`;
+  }).join('');
+  return `<h3>Timeline <small>booked flights, then this bundle's picks</small></h3>
+    <div class="timeline">${lines}</div>`;
+}
+
+function wireBoard(host) {
+  const p = EDIT;
+  const redraw = () => { EDIT_DIRTY = true; renderEditor(); };
+  host.querySelectorAll('[data-bundle]').forEach(b => b.onclick = () => {
+    collectEditor(); ACTIVE_BUNDLE = +b.dataset.bundle; renderEditor(); });
+  host.querySelectorAll('[data-pick]').forEach(r => r.onchange = () => {
+    collectEditor();
+    p.bundles[ACTIVE_BUNDLE].picks[r.dataset.pick] = r.value;
+    redraw();
+  });
+  host.querySelectorAll('[data-unfix]').forEach(b => b.onclick = () => {
+    collectEditor();
+    const key = b.dataset.unfix, set = new Set(p.unfixed || []);
+    if (set.has(key)) set.delete(key); else set.add(key);
+    p.unfixed = [...set];
+    redraw();
+  });
+  const btn = id => host.querySelector(id);
+  if (btn('#b-new')) btn('#b-new').onclick = () => {
+    collectEditor();
+    const base = p.bundles[ACTIVE_BUNDLE];
+    p.bundles.push({id: 'b' + Date.now(), name: `Bundle ${p.bundles.length + 1}`,
+                    picks: Object.assign({}, base.picks)});
+    ACTIVE_BUNDLE = p.bundles.length - 1;
+    redraw();
+  };
+  if (btn('#b-del')) btn('#b-del').onclick = () => {
+    collectEditor();
+    p.bundles.splice(ACTIVE_BUNDLE, 1);
+    ACTIVE_BUNDLE = 0;
+    redraw();
+  };
+  if (btn('#b-rename')) btn('#b-rename').onclick = () => {
+    const b = p.bundles[ACTIVE_BUNDLE];
+    const name = prompt('Name this bundle', b.name);
+    if (!name || !name.trim()) return;
+    collectEditor();
+    b.name = name.trim();
+    redraw();
   };
 }
 </script>
