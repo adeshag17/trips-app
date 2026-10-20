@@ -485,6 +485,8 @@ button.dday:hover,.dday.on{border-color:var(--accent);background:color-mix(in sr
 .pedit th{text-align:left;font-size:11px;color:var(--dim);font-weight:500;padding:4px 6px}
 .pedit td{padding:4px 6px;vertical-align:middle}
 .pedit td.who{display:flex;flex-wrap:wrap;gap:6px}
+.pedit .direct{text-align:center;white-space:nowrap}
+.pedit th.direct label{display:inline-flex;gap:5px;align-items:center;cursor:pointer}
 .chip{display:inline-flex;gap:5px;align-items:center;font-size:12.5px;
   border:1px solid var(--line);border-radius:99px;padding:3px 9px;cursor:pointer}
 .linkbtn{background:none;border:none;color:var(--accent);cursor:pointer;font:inherit;padding:4px 0}
@@ -1537,7 +1539,7 @@ if (D) render();
 // page before the network is consulted at all.
 // ---------------------------------------------------------------------------
 
-const CFG = {"owner":"adeshag17","repo":"vietnam-flights","ref":"master","workflow":"sync-mail.yml","payload":"data/trips-payload.json","review":"data/review-payload.json","prices":"data/prices-payload.json","pool":"data/flights.json","bundles":"data/bundles.json","shell":"26"};
+const CFG = {"owner":"adeshag17","repo":"vietnam-flights","ref":"master","workflow":"sync-mail.yml","payload":"data/trips-payload.json","review":"data/review-payload.json","prices":"data/prices-payload.json","pool":"data/flights.json","bundles":"data/bundles.json","pricecheck":"check-flights.yml","shell":"27"};
 
 const K = {token: 'ft.token', data: 'ft.payload', at: 'ft.payload.at',
            etag: 'ft.payload.etag'};
@@ -2687,6 +2689,8 @@ function renderEditor() {
       <td><input data-f="first" type="date" value="${d[0] || ''}"></td>
       <td><input data-f="last" type="date" value="${d[d.length - 1] || ''}"></td>
       <td class="who">${who || '<span class="dim">add travellers first</span>'}</td>
+      <td class="direct"><input type="checkbox" data-f="direct" ${l.direct ? 'checked' : ''}
+           title="Nonstop flights only"></td>
       <td><button class="linkbtn" data-delleg="${i}" title="Remove">✕</button></td>
     </tr>`;
   }).join('');
@@ -2715,6 +2719,8 @@ function renderEditor() {
       <span class="sp"></span>
       <span id="pl-msg" class="dim">${EDIT_DIRTY ? 'Unsaved changes.' : ''}</span>
       ${p.id ? '<button class="refresh ghostbtn" id="pl-del">Delete plan</button>' : ''}
+      ${p.id ? `<button class="refresh ghostbtn" id="pl-prices"
+        title="Search every open leg of every saved plan now, rather than at the next twice-daily check">Refresh prices</button>` : ''}
       <button class="refresh" id="pl-save">Save plan</button>
     </div>
     <label class="pname"><span>Trip</span>
@@ -2729,7 +2735,10 @@ function renderEditor() {
 
     <h3>Legs <small>one row per flight needed; a range of dates means any of them</small></h3>
     <table class="pedit"><thead><tr><th>From</th><th>To</th><th>Earliest</th>
-      <th>Latest</th><th>Who flies it</th><th></th></tr></thead>
+      <th>Latest</th><th>Who flies it</th>
+      <th class="direct"><label title="Nonstop flights only, on every leg">Direct only
+        <input type="checkbox" id="pl-alldirect"
+          ${p.legs.length && p.legs.every(l => l.direct) ? 'checked' : ''}></label></th><th></th></tr></thead>
       <tbody>${legs}</tbody></table>
     <button class="linkbtn" id="pl-addleg">+ Add leg</button>
     <datalist id="airports">${airports}</datalist>
@@ -2754,11 +2763,19 @@ function collectEditor() {
   const host = document.getElementById('planview');
   const p = EDIT;
   p.name = host.querySelector('#pl-name').value.trim() || p.name;
+  // A traveller's key is made from their name once there is one. One made
+  // while the name was still blank ("plan", from slug('')) is remade, and
+  // the legs that name them follow.
+  const renamed = {};
   host.querySelectorAll('[data-t]').forEach(row => {
     const t = p.travellers[+row.dataset.t];
     const label = row.querySelector('[data-f=label]').value.trim();
     t.label = label || t.label;
-    if (!t.key) t.key = slug(label);
+    if (!t.key || (t.key === 'plan' && label)) {
+      const key = slug(label);
+      if (t.key && key !== t.key) renamed[t.key] = key;
+      t.key = key;
+    }
     t.adults = Math.max(0, parseInt(row.querySelector('[data-f=adults]').value, 10) || 0);
     t.children = Math.max(0, parseInt(row.querySelector('[data-f=children]').value, 10) || 0);
   });
@@ -2776,7 +2793,9 @@ function collectEditor() {
     const z = row.querySelector('[data-f=last]').value || a;
     l.dates = a ? dateRange(a, z < a ? a : z) : [];
     l.who = [...row.querySelectorAll('[data-who]')].filter(c => c.checked)
-      .map(c => c.dataset.who);
+      .map(c => renamed[c.dataset.who] || c.dataset.who);
+    l.direct = row.querySelector('[data-f=direct]').checked;
+    if (!l.direct) delete l.direct;
     if (!l.key || l.key.startsWith('new:'))
       l.key = `${l.who.join('-') || 'leg'}:${l.from}-${l.to}`;
   });
@@ -2799,6 +2818,9 @@ function problems(p) {
       out.push(`${n}: airports are three-letter codes, like SIN`);
     if (!l.dates.length) out.push(`${n}: needs a date`);
     if (!l.who.length) out.push(`${n}: tick who flies it`);
+  });
+  p.travellers.forEach((t, i) => {
+    if (!(t.label || '').trim()) out.push(`traveller ${i + 1} needs a name - it is how their tickets are recognised`);
   });
   const keys = p.travellers.map(t => t.key);
   if (new Set(keys).size !== keys.length) out.push('two travellers have the same name');
@@ -2864,6 +2886,11 @@ function wireEditor() {
     EDIT.legs.forEach(l => { l.who = l.who.filter(k => k !== gone.key); });
     dirty(); renderEditor();
   });
+  if ($('#pl-alldirect')) $('#pl-alldirect').onchange = e => {
+    host.querySelectorAll('[data-l] [data-f=direct]').forEach(c => { c.checked = e.target.checked; });
+    collectEditor(); dirty(); redrawBoard();
+  };
+  if ($('#pl-prices')) $('#pl-prices').onclick = () => refreshPrices($('#pl-prices'));
   $('#pl-addleg').onclick = () => {
     collectEditor();
     const prev = EDIT.legs[EDIT.legs.length - 1];
@@ -2887,6 +2914,19 @@ function wireEditor() {
       while (PLANS.some(x => x.id === id)) id = `${slug(EDIT.name)}-${n++}`;
       EDIT.id = id;
     }
+    // Legs keyed while half typed ("plan:BOM-") take their real key, and
+    // the bundles' picks and unfixes follow it.
+    EDIT.legs.forEach(l => {
+      const want = `${(l.who || []).join('-') || 'leg'}:${l.from}-${l.to}`;
+      if (l.key === want || !(l.key.startsWith('new:') || /[:-]$/.test(l.key)
+                              || l.key.startsWith('plan:'))) return;
+      if (EDIT.legs.some(x => x !== l && x.key === want)) return;
+      (EDIT.bundles || []).forEach(b => {
+        if (b.picks && l.key in b.picks) { b.picks[want] = b.picks[l.key]; delete b.picks[l.key]; }
+        b.unfixed = (b.unfixed || []).map(u => u.replace(l.key, want));
+      });
+      l.key = want;
+    });
     EDIT.updated = new Date().toISOString();
     $('#pl-save').disabled = true;
     $('#pl-msg').textContent = 'Saving…';
@@ -2904,7 +2944,7 @@ function wireEditor() {
     EDIT_DIRTY = false;
     renderEditor();
     document.getElementById('pl-msg').textContent =
-      'Saved. New or changed legs are priced at the next price check.';
+      'Saved. Refresh prices to search new or changed legs now.';
   };
   if ($('#pl-del')) $('#pl-del').onclick = async () => {
     if (!confirm(`Delete the plan "${EDIT.name}"? Bookings are not affected.`)) return;
@@ -2924,6 +2964,54 @@ function wireEditor() {
     EDIT_DIRTY = false;
     renderEditor();
   };
+}
+
+// Search every open leg of every saved plan now. Starts the cloud's price
+// check - plans only, not the old Vietnam bundles' re-pricing - waits for
+// it, and redraws the board on what it found. A plan has to be saved
+// first: the check reads plans from the repository, not from this page.
+async function refreshPrices(btn) {
+  const msg = document.getElementById('pl-msg');
+  if (EDIT_DIRTY) { msg.textContent = 'Save the plan first - the check prices what is saved.'; return; }
+  const since = Date.now() - 60000;
+  const say = t => { if (msg) msg.textContent = t; };
+  btn.disabled = true;
+  btn.textContent = 'Starting…';
+  try {
+    await api(`/repos/${CFG.owner}/${CFG.repo}/actions/workflows/${CFG.pricecheck}/dispatches`,
+              {method: 'POST', body: JSON.stringify({ref: CFG.ref, inputs: {plans_only: 'true'}})});
+  } catch (e) {
+    btn.disabled = false; btn.textContent = 'Refresh prices';
+    say(writeError(e, 'start the price check'));
+    return;
+  }
+  // A few minutes: about six searches a day of each open leg, run six at
+  // a time.
+  for (let i = 0; i < 96; i++) {
+    await new Promise(r => setTimeout(r, 5000));
+    let run;
+    try {
+      const r = await api(`/repos/${CFG.owner}/${CFG.repo}/actions/workflows/${CFG.pricecheck}`
+                          + `/runs?event=workflow_dispatch&per_page=5&t=${Date.now()}`,
+                          {cache: 'no-store'});
+      run = ((await r.json()).workflow_runs || [])
+        .find(x => new Date(x.created_at).getTime() >= since);
+    } catch (e) { continue; }
+    if (!run) continue;
+    if (run.status !== 'completed') { btn.textContent = 'Searching…'; continue; }
+    btn.disabled = false; btn.textContent = 'Refresh prices';
+    if (run.conclusion !== 'success') {
+      msg.innerHTML = `The price check failed - <a href="${run.html_url}" target="_blank"
+        rel="noopener">see the run</a>`;
+      return;
+    }
+    try { PRICES = await fetchData(CFG.prices, 'ft.prices'); } catch (e) {}
+    redrawBoard();
+    say('Prices refreshed just now.');
+    return;
+  }
+  btn.disabled = false; btn.textContent = 'Refresh prices';
+  say('The price check is taking a while - it carries on in the cloud; come back in a few minutes.');
 }
 </script>
 <script>// ---------------------------------------------------------------------------
@@ -3006,7 +3094,8 @@ function boardModel(p) {
       leg: l, order: i,
       first: (l.dates || []).slice().sort()[0] || '',
       tickets: Object.fromEntries((l.who || []).map(k => [k, ticket(l, k)])),
-      options: (fares && fares.options) || [],
+      // A direct leg offers nonstops only, whatever an older search held.
+      options: ((fares && fares.options) || []).filter(o => !l.direct || !o.stops),
     };
   }).sort((a, b) => a.first.localeCompare(b.first) || a.order - b.order);
   // Booked hotels, each placed in a city: its airport code where the
