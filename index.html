@@ -544,6 +544,26 @@ button.dday:hover,.dday.on{border-color:var(--accent);background:color-mix(in sr
 .tlkey .k-booked{background:#8a93a6}
 .tlkey .k-picked{background:repeating-linear-gradient(45deg,#8a93a6 0 3px,#6b7386 3px 6px)}
 
+.pfilters{border:1px solid var(--line);border-radius:10px;padding:8px 12px;margin:4px 0 10px}
+.pfilters summary{cursor:pointer;font-size:13px}
+.pfilters summary .dim{font-size:12px;margin-left:6px}
+.pfrow{display:flex;flex-wrap:wrap;gap:10px;margin-top:10px}
+.pfrow>span{display:flex;flex-direction:column;gap:2px;min-width:96px}
+.pfrow label,.pfair>label{font-size:10.5px;color:var(--dim)}
+.planed .pfrow select,.planed .pfrow input{font:inherit;font-size:12px;padding:4px 6px;
+  border-radius:6px;border:1px solid var(--line);background:#0f1422;color:inherit;width:110px}
+.pfair{display:flex;flex-wrap:wrap;gap:5px;align-items:center;margin-top:10px}
+.pfair>label{width:100%}
+.amulti{position:relative}
+.amulti summary{cursor:pointer;font-size:12px;padding:4px 10px;border:1px solid var(--line);
+  border-radius:6px;list-style:none;min-width:180px}
+.amulti summary::after{content:' ▾';color:var(--dim)}
+.alist{position:absolute;z-index:20;margin-top:4px;background:var(--bg);border:1px solid var(--line);
+  border-radius:8px;padding:6px 10px;max-height:300px;overflow:auto;min-width:240px;
+  box-shadow:0 6px 20px #0008;display:flex;flex-direction:column;gap:2px}
+.alist label{display:flex;gap:7px;align-items:center;font-size:12.5px;cursor:pointer;padding:2px 0;white-space:nowrap}
+.planed .alist input{width:auto}
+.alist .aall{border-bottom:1px solid var(--line);padding-bottom:5px;margin-bottom:3px;font-weight:600}
 .bgrid{display:grid;grid-template-columns:minmax(300px,380px) 1fr;gap:14px;align-items:start;margin-top:16px}
 .poolpanel{border:1px solid var(--line);border-radius:11px;padding:12px;position:sticky;top:64px}
 .slotname{font-size:12px;color:var(--dim);margin:0 0 8px}
@@ -1573,7 +1593,7 @@ if (D) render();
 // page before the network is consulted at all.
 // ---------------------------------------------------------------------------
 
-const CFG = {"owner":"adeshag17","repo":"vietnam-flights","ref":"master","workflow":"sync-mail.yml","payload":"data/trips-payload.json","review":"data/review-payload.json","prices":"data/prices-payload.json","pool":"data/flights.json","bundles":"data/bundles.json","pricecheck":"check-flights.yml","shell":"28"};
+const CFG = {"owner":"adeshag17","repo":"vietnam-flights","ref":"master","workflow":"sync-mail.yml","payload":"data/trips-payload.json","review":"data/review-payload.json","prices":"data/prices-payload.json","pool":"data/flights.json","bundles":"data/bundles.json","pricecheck":"check-flights.yml","shell":"29"};
 
 const K = {token: 'ft.token', data: 'ft.payload', at: 'ft.payload.at',
            etag: 'ft.payload.etag'};
@@ -3062,10 +3082,12 @@ async function refreshPrices(btn) {
 // ---------------------------------------------------------------------------
 
 let ACTIVE_BUNDLE = 0;
+let FILTERS_OPEN = false;
+let AIRLINES_OPEN = false;
 let EDIT_DETAILS_OPEN = true;
 let FOCUS = null;            // {bundle, leg, trav}: the slot the fares are for
 let DRAG = null;             // the fare being dragged onto a slot
-const FILTERS = {date: '', stops: '', maxPrice: '', airline: '', sort: 'price'};
+const FILTERS = {date: '', sort: 'price'};   // the fare list's own: which day, what order
 
 const HUES = ['#2a78d6', '#eb6834', '#1baf7a', '#eda100', '#e87ba4', '#8f7de8'];
 
@@ -3129,9 +3151,13 @@ function boardModel(p) {
       first: (l.dates || []).slice().sort()[0] || '',
       tickets: Object.fromEntries((l.who || []).map(k => [k, ticket(l, k)])),
       // A direct leg offers nonstops only, whatever an older search held.
-      options: ((fares && fares.options) || []).filter(o => !l.direct || !o.stops),
+      all: ((fares && fares.options) || []).filter(o => !l.direct || !o.stops),
     };
   }).sort((a, b) => a.first.localeCompare(b.first) || a.order - b.order);
+  // What the plan's filters let through: the fare list, Auto-fill and the
+  // Cheapest bundle choose from these. Picks already made are kept, from
+  // all of them, and flagged if a filter now excludes them.
+  legs.forEach(m => { m.options = m.all.filter(o => allowed(p, o)); });
   // Booked hotels, each placed in a city: its airport code where the
   // confirmation gave one, else the city its address names.
   const airports = (typeof D !== 'undefined' && D && D.airports) || {};
@@ -3196,7 +3222,81 @@ function isFixed(p, b, m, k) {
 // Who on a leg still needs a seat in this bundle.
 const needs = (p, b, m) => (m.leg.who || []).filter(k => !isFixed(p, b, m, k));
 
-const pickOf = (b, m) => m.options.find(o => sig(o) === (b.picks || {})[m.leg.key]) || null;
+const pickOf = (b, m) => m.all.find(o => sig(o) === (b.picks || {})[m.leg.key]) || null;
+
+// ---------- the plan's fare filters ---------------------------------------
+
+// Saved with the plan, so a bundle built from them - by hand or Auto-fill -
+// never takes a fare you have ruled out: an airline you will not fly, a
+// three-in-the-morning departure, a seven-hour layover.
+// "THAI / Cathay Pacific" is two airlines: leaving either out leaves the fare out.
+const carriers = o => (o.airline || '').split('/').map(a => a.trim()).filter(Boolean);
+const hourOf = hhmm => +(hhmm || '0').slice(0, 2) + +(hhmm || '0:0').slice(3, 5) / 60;
+function allowed(p, o) {
+  const f = p.filters || {};
+  const num = v => v === '' || v == null ? null : +v;
+  const out = f.airlines_out || [];
+  if (out.length && carriers(o).some(a => out.includes(a))) return false;
+  if (num(f.max_stops) != null && o.stops > num(f.max_stops)) return false;
+  if (num(f.max_lay_h) != null && (o.lay || 0) > num(f.max_lay_h) * 60) return false;
+  if (num(f.max_dur_h) != null && o.duration && o.duration > num(f.max_dur_h) * 60) return false;
+  const dep = hourOf(o.dep), arr = hourOf(o.arr);
+  if (num(f.dep_from) != null && dep < num(f.dep_from)) return false;
+  if (num(f.dep_to) != null && dep > num(f.dep_to)) return false;
+  if (num(f.arr_from) != null && arr < num(f.arr_from)) return false;
+  if (num(f.arr_to) != null && arr > num(f.arr_to)) return false;
+  return true;
+}
+
+function filterSummary(f) {
+  const out = [];
+  if ((f.airlines_out || []).length) out.push(`${f.airlines_out.length} airline${f.airlines_out.length > 1 ? 's' : ''} out`);
+  const span = (a, b, what) => (a !== '' && a != null) || (b !== '' && b != null)
+    ? `${what} ${a !== '' && a != null ? String(a).padStart(2, '0') + ':00' : 'any'}–${b !== '' && b != null ? String(b).padStart(2, '0') + ':00' : 'any'}` : '';
+  [span(f.dep_from, f.dep_to, 'leaves'), span(f.arr_from, f.arr_to, 'lands')].forEach(x => x && out.push(x));
+  if (f.max_stops !== '' && f.max_stops != null) out.push(+f.max_stops ? `≤ ${f.max_stops} stop` : 'nonstop');
+  if (f.max_lay_h) out.push(`layover ≤ ${f.max_lay_h}h`);
+  if (f.max_dur_h) out.push(`journey ≤ ${f.max_dur_h}h`);
+  return out.join(' · ');
+}
+
+function renderFareFilters(p, M) {
+  const f = p.filters || {};
+  const airlines = [...new Set(M.legs.flatMap(m => m.all.flatMap(carriers)))].sort();
+  const out = new Set(f.airlines_out || []);
+  const hours = (name, label) => `<span><label>${label}</label><select data-pf="${name}">
+      <option value="">any</option>${Array.from({length: 24}, (_, h) =>
+        `<option value="${h}" ${String(f[name]) === String(h) ? 'selected' : ''}>${String(h).padStart(2, '0')}:00</option>`).join('')}
+    </select></span>`;
+  const shown = M.legs.reduce((n, m) => n + m.options.length, 0);
+  const all = M.legs.reduce((n, m) => n + m.all.length, 0);
+  return `<details class="pfilters" ${FILTERS_OPEN ? 'open' : ''}>
+    <summary><b>Filters</b> <span class="dim">${esc(filterSummary(f)) || 'none - every fare is in play'}
+      · ${shown} of ${all} fares</span></summary>
+    <div class="pfrow">
+      ${hours('dep_from', 'Leaves from')}${hours('dep_to', 'Leaves by')}
+      ${hours('arr_from', 'Lands from')}${hours('arr_to', 'Lands by')}
+      <span><label>Stops</label><select data-pf="max_stops">
+        ${[['', 'any'], ['0', 'nonstop'], ['1', 'up to 1'], ['2', 'up to 2']].map(([v, t]) =>
+          `<option value="${v}" ${String(f.max_stops == null ? '' : f.max_stops) === v ? 'selected' : ''}>${t}</option>`).join('')}</select></span>
+      <span><label>Layover up to (h)</label><input type="number" min="0" step="0.5" data-pf="max_lay_h"
+        value="${esc(f.max_lay_h == null ? '' : f.max_lay_h)}" placeholder="any"></span>
+      <span><label>Journey up to (h)</label><input type="number" min="0" step="0.5" data-pf="max_dur_h"
+        value="${esc(f.max_dur_h == null ? '' : f.max_dur_h)}" placeholder="any"></span>
+      <span><label>&nbsp;</label><button class="miniact" id="pf-clear" type="button">Clear filters</button></span>
+    </div>
+    <div class="pfair"><label>Airlines</label>
+      <details class="amulti" ${AIRLINES_OPEN ? 'open' : ''}>
+        <summary>${out.size ? `${airlines.length - out.size} of ${airlines.length} airlines` : `All ${airlines.length} airlines`}</summary>
+        <div class="alist">
+          <label class="aall"><input type="checkbox" data-pfall ${out.size ? '' : 'checked'}> All</label>
+          ${airlines.map(a => `<label><input type="checkbox" data-pfair="${esc(a)}" ${out.has(a) ? '' : 'checked'}>
+            ${esc(a)}</label>`).join('') || '<span class="dim">no fares yet</span>'}
+        </div>
+      </details>
+    </div>
+  </details>`;
+}
 
 // ---------- a bundle, added up --------------------------------------------
 
@@ -3332,6 +3432,7 @@ function renderBoard(p) {
   return `<section class="board" id="board">
     <h3>Bundles <small>booked flights are fixed 🔒 · click an open slot, then pick
       a flight from the list on the left</small></h3>
+    ${renderFareFilters(p, M)}
     ${renderCompare(p, bundles, A)}
     ${renderGantt(p, M, bundles[ACTIVE_BUNDLE], A[ACTIVE_BUNDLE])}
     <div class="bgrid">
@@ -3442,8 +3543,10 @@ function renderSlot(p, M, b, bi, m, k) {
   const body = o
     ? (() => { const {arr} = fareTimes(o);
         return `${esc(o.airline)} · ${dayMonth(o.date)} ${esc(o.dep)}→${esc(o.arr)}${
-          arr.slice(0, 10) > o.date ? '<sup>+1</sup>' : ''} · ${rupees(o.pp)}/pp`; })()
+          arr.slice(0, 10) > o.date ? '<sup>+1</sup>' : ''} · ${rupees(o.pp)}/pp${
+          allowed(p, o) ? '' : ' <span class="tag warn">outside your filters</span>'}`; })()
     : m.options.length ? '<span class="dim">empty — click, then pick a flight</span>'
+    : m.all.length ? '<span class="warn">no fare passes your filters</span>'
     : '<span class="dim">no fares yet — the next price check finds some</span>';
   return `<div class="slot ${o ? 'filled' : ''} ${focused ? 'focused' : ''} ${t ? 'unfixed' : ''}"
       data-slot="${bi}|${esc(l.key)}|${esc(k)}" role="button" tabindex="0">
@@ -3456,12 +3559,8 @@ function renderSlot(p, M, b, bi, m, k) {
 
 function poolRows(p, M) {
   const m = M.legs.find(x => x.leg.key === FOCUS.leg);
-  const f = FILTERS, maxP = +f.maxPrice || 0;
-  const rows = m.options.filter(o =>
-    (!f.date || o.date === f.date)
-    && (f.stops === '' || o.stops <= +f.stops)
-    && (!maxP || o.pp <= maxP)
-    && (!f.airline || o.airline.toLowerCase().includes(f.airline.toLowerCase())));
+  const f = FILTERS;
+  const rows = m.options.filter(o => !f.date || o.date === f.date);
   const key = {price: o => o.pp, depart: o => fareTimes(o).dep,
                arrive: o => fareTimes(o).arr, duration: o => o.duration || 0}[f.sort];
   return {m, rows: rows.sort((a, b) => key(a) < key(b) ? -1 : key(a) > key(b) ? 1 : a.pp - b.pp)};
@@ -3489,16 +3588,10 @@ function renderPool(p, M, bundles) {
     <div class="filters">
       <div class="frow">
         <span><label>Date</label>${sel('date', [['', 'any'], ...dates.map(d => [d, dayMonth(d)])])}</span>
-        <span><label>Stops</label>${sel('stops', [['', 'any'], ['0', 'nonstop'], ['1', 'up to 1']])}</span>
         <span><label>Sort</label>${sel('sort', [['price', 'price'], ['depart', 'departs'],
                                                 ['arrive', 'arrives'], ['duration', 'duration']])}</span>
       </div>
-      <div class="frow">
-        <span><label>Max ₹/person</label><input type="number" step="1000" data-filter="maxPrice"
-          value="${esc(FILTERS.maxPrice)}" placeholder="any"></span>
-        <span class="wide"><label>Airline</label><input data-filter="airline"
-          value="${esc(FILTERS.airline)}" placeholder="e.g. Vietjet"></span>
-      </div>
+      <p class="dim small">Airlines, times, stops and layovers: the Filters above.</p>
     </div>
     <div class="poolscroll" id="poolcards">${renderPoolCards(p, M, bundles)}</div>`;
 }
@@ -3508,9 +3601,12 @@ function renderPoolCards(p, M, bundles) {
   const {m, rows} = poolRows(p, M);
   const open = needs(p, b, m);
   const seats = open.reduce((n, k) => n + (M.people[k] || 1), 0);
-  if (!m.options.length)
+  if (!m.all.length)
     return `<p class="empty">No fares for ${esc(m.leg.from)} → ${esc(m.leg.to)} yet.
-      Save the plan; the next price check searches it.</p>`;
+      Save the plan, then Refresh prices.</p>`;
+  if (!m.options.length)
+    return `<p class="empty">${m.all.length} fares, none of them inside your filters
+      above.</p>`;
   if (!rows.length) return '<p class="empty">Nothing matches the filters.</p>';
   // Would this fare clash with the traveller's other flights in this bundle?
   const others = analyse(p, M, Object.assign({}, b, {picks: Object.assign({}, b.picks,
@@ -3665,6 +3761,10 @@ function wireBoard(host, dirty) {
       ACTIVE_BUNDLE = 0; FOCUS = null;
       return changed();
     }
+    if ((el = on('#pf-clear'))) {
+      p.filters = {};
+      return changed();
+    }
     if ((el = on('[data-datechip]'))) {
       FILTERS.date = FILTERS.date === el.dataset.datechip ? '' : el.dataset.datechip;
       return redrawBoard();
@@ -3691,12 +3791,34 @@ function wireBoard(host, dirty) {
       }
     }
   });
+  const fd = board.querySelector('.pfilters');
+  if (fd) fd.addEventListener('toggle', () => { FILTERS_OPEN = fd.open; });
+  const am = board.querySelector('.amulti');
+  if (am) am.addEventListener('toggle', () => { AIRLINES_OPEN = am.open; });
   board.addEventListener('keydown', e => {
     if ((e.key === 'Enter' || e.key === ' ') && e.target.matches('[data-slot]')) {
       e.preventDefault(); e.target.click();
     }
   });
   board.addEventListener('change', e => {
+    if (e.target.dataset.pfair != null || e.target.dataset.pfall != null) {
+      const f = p.filters = Object.assign({}, p.filters);
+      if (e.target.dataset.pfall != null) {
+        f.airlines_out = e.target.checked ? []
+          : [...new Set(boardModel(p).legs.flatMap(m => m.all.flatMap(carriers)))];
+      } else {
+        const out = new Set(f.airlines_out || []);
+        if (e.target.checked) out.delete(e.target.dataset.pfair); else out.add(e.target.dataset.pfair);
+        f.airlines_out = [...out];
+      }
+      AIRLINES_OPEN = true;
+      return changed();
+    }
+    const pf = e.target.dataset.pf;
+    if (pf) {
+      p.filters = Object.assign({}, p.filters, {[pf]: e.target.value});
+      return changed();
+    }
     const r = e.target.dataset.rename;
     if (r != null) {
       p.bundles[+r].name = e.target.value.trim() || p.bundles[+r].name;
