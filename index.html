@@ -427,9 +427,14 @@ footer{color:var(--dim);font-size:12px;margin-top:26px;line-height:1.6}
 .pnow small{font-size:13px;font-weight:500;color:var(--dim)}
 .pnow .dim{font-size:13px;font-weight:500;margin-left:8px}
 .pmoves{font-size:12.5px;color:var(--dim)}
-.pmoves .up{color:#ffb4a2}.pmoves .down{color:#8fe3a4}
+.pmoves .up,.bverdict .up{color:#ffb4a2}.pmoves .down,.bverdict .down{color:#8fe3a4}
 .spark{display:block;width:100%;height:46px;margin:10px 0 2px;color:#7cc5ff}
 .prange{font-size:12px}
+.bookedh{margin-top:34px !important}
+.bpair{display:grid;grid-template-columns:auto auto 1fr;gap:18px;align-items:end;margin:8px 0 4px}
+.bpair>div{font-size:20px;font-weight:700;font-variant-numeric:tabular-nums}
+.bpair small{display:block;font-size:11px;font-weight:500;color:var(--dim)}
+.bpair .bverdict{font-size:13px;font-weight:600;text-align:right}
 .popts{width:100%;margin-top:10px;border-collapse:collapse;font-size:13px}
 .popts td{padding:6px 4px;border-top:1px solid var(--line);vertical-align:top}
 .popts td.num{text-align:right;white-space:nowrap;font-weight:600}
@@ -448,8 +453,9 @@ footer{color:var(--dim);font-size:12px;margin-top:26px;line-height:1.6}
 .boardbar a{color:var(--accent)}
 
 /* The plan editor. */
-.planed{max-width:1000px;margin:0 auto;padding:18px 20px 80px;width:100%}
-.planed .pbar{display:flex;gap:8px;align-items:center;margin-bottom:14px}
+.planed{max-width:1560px;margin:0 auto;padding:18px 20px 80px;width:100%}
+.planed .pbar{display:flex;gap:8px;align-items:center;margin:-18px -20px 14px;padding:10px 20px;
+  position:sticky;top:0;z-index:5;background:var(--bg);border-bottom:1px solid var(--line)}
 .planed .pbar select{font:inherit;padding:7px 10px;border-radius:8px;min-width:260px;
   border:1px solid var(--line);background:#0f1422;color:inherit}
 .planed .sp{flex:1}
@@ -477,37 +483,104 @@ footer{color:var(--dim);font-size:12px;margin-top:26px;line-height:1.6}
 .pfoot{display:flex;gap:10px;align-items:center;margin-top:24px}
 .planed .small{font-size:12px;margin-top:8px}
 
-/* The board, inside the plan view. */
-.board{margin-top:18px}
-.bchips{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:8px}
-.bchip{font:inherit;font-size:13px;padding:6px 12px;border-radius:9px;cursor:pointer;
-  background:none;color:inherit;border:1px solid var(--line)}
-.bchip.on{background:#1b2a47;border-color:#2c4877;color:#cfe3ff}
-.btotal{margin:6px 0 12px;font-size:15px}
-.brow{border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin:8px 0}
-.brow.fixed{opacity:.85}
-.brow.open,.brow.part{border-color:#2c4877}
-.bleg{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
-.bleg .pill{font-size:11px}
-.bticket{font-size:12.5px;margin-top:6px;color:var(--dim)}
-.bticket b{color:inherit}
-.bticket.struck{text-decoration:line-through;opacity:.6}
-.bopts{display:grid;gap:4px;margin-top:8px}
-.bopt{display:grid;grid-template-columns:20px 64px 1fr auto;gap:8px;align-items:center;
-  padding:6px 8px;border-radius:8px;cursor:pointer;font-size:13px}
-.bopt:hover{background:#ffffff08}
-.bopt.on{background:#1b2a47}
-.bopt input{width:auto}
-.bopt .num{text-align:right;white-space:nowrap}
-.timeline{display:grid;gap:8px}
-.tline{display:flex;flex-wrap:wrap;gap:6px;align-items:center;font-size:12.5px}
-.tline > b{min-width:90px}
-.tstep{border:1px solid var(--line);border-radius:7px;padding:3px 8px}
-.tstep.booked{border-color:#3d6b40}
-.tstep.picked{border-color:#2c4877;background:#1b2a4766}
-.tstep.open{border-style:dashed;color:var(--dim)}
-.tstay{color:var(--dim);font-size:11.5px}
-.pdetails{margin-top:22px;border-top:1px solid var(--line);padding-top:10px}
+/* The board, inside the plan view: the laptop planner's layout - compare
+   cards, a timeline, the fares on the left, bundles side by side. */
+.board{margin-top:22px}
+.board .good{color:var(--ok)} .board .bad{color:var(--bad)} .board .warn{color:var(--warn)}
+.sectitle{font-size:11px;text-transform:uppercase;letter-spacing:.07em;color:var(--dim);
+  margin:16px 0 8px;font-weight:600}
+.cmp{display:flex;gap:10px;overflow-x:auto;padding:4px 2px 8px;align-items:stretch}
+.cmp #b-new{align-self:center}
+.cmpcard{flex:1 1 0;min-width:210px;max-width:330px;border:1px solid var(--line);border-radius:10px;
+  padding:11px 13px;cursor:pointer;background:transparent;text-align:left;font:inherit;color:inherit}
+.cmpcard:hover,.cmpcard.on{border-color:var(--accent)}
+.cmpcard.on{box-shadow:inset 0 0 0 1px var(--accent)}
+.cmpcard.best{background:color-mix(in srgb,var(--ok) 7%,transparent)}
+.cmpname{display:flex;align-items:center;gap:6px;font-size:12.5px;font-weight:600;margin-bottom:3px;flex-wrap:wrap}
+.cmptot{display:block;font-size:24px;font-weight:650;letter-spacing:-.02em;font-variant-numeric:tabular-nums}
+.cmpdelta{display:block;font-size:11.5px;min-height:15px}
+.cmpstats{display:flex;gap:14px;margin-top:8px;padding-top:8px;border-top:1px solid var(--line)}
+.cmpstat{font-size:11px;color:var(--dim);line-height:1.35}
+.cmpstat b{display:block;font-size:12.5px;color:var(--ink);font-weight:600;font-variant-numeric:tabular-nums}
+.tag{font-size:10px;padding:1px 6px;border-radius:99px;border:1px solid var(--line);color:var(--dim);
+  white-space:nowrap;font-weight:400}
+.tag.bad{color:var(--bad);border-color:color-mix(in srgb,var(--bad) 45%,transparent)}
+.tag.warn{color:var(--warn);border-color:color-mix(in srgb,var(--warn) 50%,transparent)}
+.tag.good{color:var(--ok);border-color:color-mix(in srgb,var(--ok) 45%,transparent)}
+.miniact{font:inherit;font-size:11px;padding:3px 8px;border-radius:7px;border:1px solid var(--line);
+  background:transparent;color:var(--dim);cursor:pointer;white-space:nowrap}
+.miniact:hover{border-color:var(--accent);color:var(--accent)}
+
+.tlwrap{overflow-x:auto}
+.tl{min-width:760px}
+.tlrow,.tlaxis{display:grid;grid-template-columns:110px 1fr;gap:10px;align-items:center;margin-bottom:5px}
+.tlname{font-size:11.5px;color:var(--dim);text-align:right;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tltrack{position:relative;height:24px;background:#0f1422;border-radius:6px;border:1px solid var(--line)}
+.bar{position:absolute;top:2px;height:18px;border-radius:4px;font-size:10px;line-height:18px;
+  padding:0 5px;color:#fff;white-space:nowrap;overflow:hidden;box-shadow:0 0 0 2px #0f1422}
+.bar.transit{background:#8a93a6}
+.bar.transit.picked{background:repeating-linear-gradient(45deg,#8a93a6 0 5px,#6b7386 5px 10px)}
+.bar.stay{opacity:.9}
+.ticks{position:relative;height:15px}
+.tick{position:absolute;font-size:10px;color:var(--dim);transform:translateX(-50%);white-space:nowrap}
+.tlkey{display:flex;gap:14px;font-size:11px;color:var(--dim);margin-top:6px;flex-wrap:wrap}
+.tlkey i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:4px;vertical-align:-1px}
+.tlkey .k-booked{background:#8a93a6}
+.tlkey .k-picked{background:repeating-linear-gradient(45deg,#8a93a6 0 3px,#6b7386 3px 6px)}
+
+.bgrid{display:grid;grid-template-columns:minmax(300px,380px) 1fr;gap:14px;align-items:start;margin-top:16px}
+.poolpanel{border:1px solid var(--line);border-radius:11px;padding:12px;position:sticky;top:64px}
+.slotname{font-size:12px;color:var(--dim);margin:0 0 8px}
+.slotname b{color:var(--ink)}
+.filters{border-bottom:1px solid var(--line);padding-bottom:8px;margin-bottom:8px}
+.filters label{font-size:10.5px;color:var(--dim);display:block;margin:0 0 2px}
+.frow{display:flex;gap:7px;margin-bottom:6px}
+.frow>span{flex:1 1 0;min-width:0}
+.frow>span.wide{flex:1.6 1 0}
+.planed .filters select,.planed .filters input{width:100%;min-width:0;font:inherit;font-size:12px;
+  padding:4px 6px;border-radius:6px;border:1px solid var(--line);background:#0f1422;color:inherit}
+.poolscroll{max-height:calc(100vh - 300px);min-height:200px;overflow-y:auto;padding-right:3px}
+.fcard{border:1px solid var(--line);border-radius:9px;padding:7px 9px;margin-bottom:6px;cursor:pointer}
+.fcard:hover{border-color:var(--accent)}
+.fcard.on{border-color:var(--ok);background:color-mix(in srgb,var(--ok) 8%,transparent)}
+.fcard .top{display:flex;justify-content:space-between;gap:8px;align-items:baseline}
+.fcard .air{font-weight:600;font-size:12.5px}
+.fcard .pr{font-weight:650;font-variant-numeric:tabular-nums;white-space:nowrap}
+.fcard .mid{font-size:11.5px;color:var(--dim);font-variant-numeric:tabular-nums;margin-top:2px}
+.fcard .tags,.gblock .tags{margin-top:4px;display:flex;gap:4px;flex-wrap:wrap}
+.empty{color:var(--dim);font-size:12.5px;margin:10px 0}
+
+.bundles{display:flex;gap:12px;align-items:start;overflow-x:auto;padding-bottom:6px}
+.bundle{flex:1 1 0;min-width:290px;border:1px solid var(--line);border-radius:11px;padding:11px 12px}
+.bundle.active{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent)}
+.bhead{display:flex;align-items:center;gap:5px;margin-bottom:3px}
+.planed input.bname{font-weight:650;font-size:14px;background:transparent;border:1px solid transparent;
+  padding:1px 4px;min-width:0;flex:1}
+.planed input.bname:hover,.planed input.bname:focus{border-color:var(--line);outline:none}
+.btot{font-size:18px;font-weight:650;font-variant-numeric:tabular-nums}
+.bsub{font-size:11px;color:var(--dim);margin-bottom:8px}
+.gblock{border-top:1px solid var(--line);padding-top:6px;margin-top:6px}
+.glabel{display:flex;align-items:center;gap:6px;font-size:12px;font-weight:600;margin-bottom:4px}
+.glabel .hrs{margin-left:auto;font-weight:400;color:var(--dim);font-size:11px;text-align:right}
+.dot{width:9px;height:9px;border-radius:50%;flex:none}
+.slot{border:1px dashed var(--line);border-radius:7px;padding:4px 7px;margin-bottom:3px;
+  font-size:11.5px;cursor:pointer;color:var(--dim)}
+.slot:hover{border-color:var(--accent)}
+.slot.filled{border-style:solid;color:var(--ink)}
+.slot.fixed{border-style:solid;cursor:default;background:color-mix(in srgb,var(--ok) 6%,transparent);
+  border-color:color-mix(in srgb,var(--ok) 35%,transparent);color:var(--ink)}
+.slot.focused{border-color:var(--accent);background:color-mix(in srgb,var(--accent) 10%,transparent)}
+.slot.valid{border-color:color-mix(in srgb,var(--ok) 60%,transparent)}
+.slot.over{border-color:var(--ok);background:color-mix(in srgb,var(--ok) 14%,transparent)}
+.slot .sk{font-size:10px;text-transform:uppercase;letter-spacing:.05em;color:var(--dim)}
+.slot .sv{font-variant-numeric:tabular-nums}
+.slot .sv.struck{text-decoration:line-through;opacity:.6}
+.slot .sx{float:right;color:var(--accent);cursor:pointer;margin-left:8px;font-size:11px}
+.slot.fixed .sx{color:var(--dim)}
+.slot .sx:hover{text-decoration:underline}
+.slot code{font-size:10.5px}
+.pdetails{margin-top:16px;border-top:1px solid var(--line);padding-top:10px}
+.pdetails .pedit{max-width:1000px}
 .pdetails summary{cursor:pointer;font-weight:600;font-size:14px}
 </style>
 </head><body>
@@ -1451,7 +1524,7 @@ if (D) render();
 // page before the network is consulted at all.
 // ---------------------------------------------------------------------------
 
-const CFG = {"owner":"adeshag17","repo":"vietnam-flights","ref":"master","workflow":"sync-mail.yml","payload":"data/trips-payload.json","review":"data/review-payload.json","prices":"data/prices-payload.json","pool":"data/flights.json","bundles":"data/bundles.json","shell":"24"};
+const CFG = {"owner":"adeshag17","repo":"vietnam-flights","ref":"master","workflow":"sync-mail.yml","payload":"data/trips-payload.json","review":"data/review-payload.json","prices":"data/prices-payload.json","pool":"data/flights.json","bundles":"data/bundles.json","shell":"25"};
 
 const K = {token: 'ft.token', data: 'ft.payload', at: 'ft.payload.at',
            etag: 'ft.payload.etag'};
@@ -2308,10 +2381,50 @@ function renderPrices(p) {
   return `<div class="pwrap">
     <p class="dim">At today's lowest fares for each open leg, checked twice a
     day. Fares are what Google Flights advertised, not quotes.</p>
-    ${body}</div>`;
+    ${body}${renderBookedPrices(p.booked || [])}</div>`;
+}
+
+// Flights already booked, priced every check until they fly: what that same
+// flight costs a seat now against what a seat cost you. Research, not a
+// prompt to act - most of these tickets cannot be changed for free.
+function renderBookedPrices(list) {
+  if (!list.length) return '';
+  const rows = list.map(f => {
+    const d = f.now_pp != null && f.paid_pp ? f.now_pp - f.paid_pp : null;
+    const verdict = d == null ? '' : d > 0
+      ? `<span class="down">you paid ${rupees(d)} less</span>`
+      : d < 0 ? `<span class="up">now ${rupees(-d)} cheaper</span>`
+      : '<span class="flat">same as you paid</span>';
+    const cheap = f.cheapest && f.now_pp != null && f.cheapest.pp < f.now_pp
+      ? `<div class="dim">cheapest that day ${rupees(f.cheapest.pp)} · ${esc(f.cheapest.airline)} ${esc(f.cheapest.dep)}</div>` : '';
+    return `<div class="pcard bcard">
+      <div class="phead"><b>${esc(f.origin)} → ${esc(f.destination)}</b>
+        <span>${esc(f.airline)} ${esc(f.flight_no)}</span>
+        <span class="dim">${shortDate(f.date)} ${esc(f.depart.slice(11, 16))} · ${esc(f.trip)}</span></div>
+      <div class="bpair">
+        <div><small>paid a seat</small>${f.paid_pp ? rupees(f.paid_pp) : '—'}${
+          f.split ? '<span class="dim" title="Half of a return booking: the confirmation states one total"> ≈</span>' : ''}</div>
+        <div><small>now</small>${f.now_pp != null ? rupees(f.now_pp) : '—'}</div>
+        <div class="bverdict">${verdict}</div>
+      </div>
+      ${f.now_pp == null ? `<p class="dim">This flight has not turned up in a search
+        yet. It is looked for at every check until it flies.</p>` : ''}
+      ${cheap}
+      ${sparkline(f.series)}
+      ${f.series && f.series.length ? `<div class="prange dim">low ${rupees(f.low)} · high
+        ${rupees(f.high)} · ${f.series.length} ${f.series.length === 1 ? 'check' : 'days of checks'}
+        since ${shortDate(f.since)}</div>` : ''}
+    </div>`;
+  }).join('');
+  return `<h2 class="bookedh">Booked flights <small>what the same flight costs now</small></h2>
+    <p class="dim">Each booked flight is priced every check until it flies, one
+    seat, same airline and departure time.</p>${rows}`;
 }
 
 function renderPlanPrices(p) {
+  // Booked legs ride along for the board, which can unfix them; here only
+  // what is still to book counts.
+  p = Object.assign({}, p, {legs: p.legs.filter(l => !l.booked)});
   if (!p.legs.length) {
     return `<h2>${esc(p.name)} <small>everything is booked</small></h2>`;
   }
@@ -2322,7 +2435,7 @@ function renderPlanPrices(p) {
         <p class="dim">Not priced yet — searched on the next check, for
         ${l.dates.map(shortDate).join(', ')}.</p></div>`;
     }
-    const opts = (l.options || []).map(o => `<tr>
+    const opts = (l.options || []).slice(0, 4).map(o => `<tr>
         <td>${shortDate(o.date)}</td>
         <td>${esc(o.airline)}<div class="dim">${esc(o.dep)}–${esc(o.arr)}
           · ${o.stops ? o.stops + ' stop' + (o.stops > 1 ? 's' : '') : 'nonstop'}</div></td>
@@ -2567,14 +2680,14 @@ function renderEditor() {
       <button class="refresh" id="pl-new">+ New plan</button>
       <button class="refresh ghostbtn" id="pl-copy" ${p.id ? '' : 'disabled'}>Copy</button>
       <span class="sp"></span>
+      <span id="pl-msg" class="dim">${EDIT_DIRTY ? 'Unsaved changes.' : ''}</span>
+      ${p.id ? '<button class="refresh ghostbtn" id="pl-del">Delete plan</button>' : ''}
+      <button class="refresh" id="pl-save">Save plan</button>
     </div>
-    <label class="pname"><span>Name</span>
+    <label class="pname"><span>Trip</span>
       <input id="pl-name" value="${esc(p.name)}"></label>
 
-    ${renderBoard(p)}
-
-    <details class="pdetails" ${p.legs.length ? '' : 'open'}
-             ${EDIT_DETAILS_OPEN ? 'open' : ''}>
+    <details class="pdetails" ${EDIT_DETAILS_OPEN || !p.legs.length ? 'open' : ''}>
     <summary>Travellers and legs</summary>
     <h3>Travellers <small>each traveller is booked as one ticket group</small></h3>
     <table class="pedit"><thead><tr><th>Who</th><th>Adults</th><th>Children</th><th></th></tr></thead>
@@ -2589,15 +2702,11 @@ function renderEditor() {
     <datalist id="airports">${airports}</datalist>
     </details>
 
-    <div class="pfoot">
-      <span id="pl-msg" class="dim">${EDIT_DIRTY ? 'Unsaved changes.' : ''}</span>
-      <span class="sp"></span>
-      ${p.id ? '<button class="refresh ghostbtn" id="pl-del">Delete plan</button>' : ''}
-      <button class="refresh" id="pl-save">Save plan</button>
-    </div>
+    ${renderBoard(p)}
+
     <p class="dim small">Saved to the private repository. The next price check
-    - twice a day - prices every open leg; a leg already booked is matched to
-    its ticket automatically.</p>
+    - twice a day - prices every open leg, and every leg a bundle has unfixed;
+    a leg already booked is matched to its ticket automatically.</p>
   </div>`;
   wireEditor();
 }
@@ -2656,8 +2765,9 @@ function wireEditor() {
   const host = document.getElementById('planview');
   const $ = s => host.querySelector(s);
   const dirty = () => { EDIT_DIRTY = true; $('#pl-msg').textContent = 'Unsaved changes.'; };
-  host.querySelectorAll('input').forEach(i => i.addEventListener('input', dirty));
-  host.querySelectorAll('input[type=checkbox]').forEach(i => i.addEventListener('change', dirty));
+  // The plan's own fields; the board's filters are not changes to the plan.
+  host.querySelectorAll('.pname input, .pdetails input').forEach(i => i.addEventListener('input', dirty));
+  host.querySelectorAll('.pdetails input[type=checkbox]').forEach(i => i.addEventListener('change', dirty));
   // A traveller's name is what the leg ticks show, so finishing one redraws.
   host.querySelectorAll('[data-t] [data-f=label]').forEach(i =>
     i.addEventListener('change', () => { collectEditor(); renderEditor(); }));
@@ -2685,9 +2795,17 @@ function wireEditor() {
     EDIT = copy; EDIT_DIRTY = true;
     renderEditor();
   };
-  wireBoard(host, dirty);
+  wireBoard(host);
   const details = host.querySelector('.pdetails');
-  if (details) details.addEventListener('toggle', () => { EDIT_DETAILS_OPEN = details.open; });
+  if (details) {
+    details.addEventListener('toggle', () => { EDIT_DETAILS_OPEN = details.open; });
+    // A leg or a headcount changed above shows on the board below as soon
+    // as it is entered.
+    details.addEventListener('change', e => {
+      if (e.target.matches('[data-t] [data-f=label]')) return;   // redraws everything
+      collectEditor(); redrawBoard();
+    });
+  }
 
   $('#pl-addtrav').onclick = () => {
     collectEditor();
@@ -2765,260 +2883,624 @@ function wireEditor() {
 }
 </script>
 <script>// ---------------------------------------------------------------------------
-// The board: booked legs fixed, the rest chosen.
+// The board, inside the plan view: bundles side by side, a slot per
+// traveller per leg, and the flights that can fill the slot you clicked.
 //
-// What is already booked comes in fixed - the actual ticket, from the trips
-// data - and only the legs still to book are chosen, from the fares the
-// price check found for them. A fixed leg can be taken off "fixed" to see
-// what replacing it would cost; it is then priced like an open leg at the
-// next check. Bundles are alternative sets of choices, compared on what the
-// whole trip comes to: what has been paid, plus what is picked.
-//
-// Drawn inside the plan view (plans.js), so a plan and its board are one
-// page: change a leg above, see what it does to the board below.
+// The laptop planner's layout - compare cards, a timeline, the fares on the
+// left and the bundles on the right - on the plan's own legs, so it works
+// for any plan rather than one trip's hard-coded shape. What is already
+// booked comes in fixed: the ticket, from the trips data. A bundle can take
+// a ticket off "fixed" to see what replacing it would cost; that is the
+// bundle's own choice, so one bundle can keep a ticket and the next replace
+// it. Bundles, their picks and what they unfixed save into the plan file.
 // ---------------------------------------------------------------------------
 
 let ACTIVE_BUNDLE = 0;
-let EDIT_DETAILS_OPEN = false;
+let EDIT_DETAILS_OPEN = true;
+let FOCUS = null;            // {bundle, leg, trav}: the slot the fares are for
+let DRAG = null;             // the fare being dragged onto a slot
+const FILTERS = {date: '', stops: '', maxPrice: '', airline: '', sort: 'price'};
+
+const HUES = ['#2a78d6', '#eb6834', '#1baf7a', '#eda100', '#e87ba4', '#8f7de8'];
 
 const sig = o => `${o.date}|${o.airline}|${o.dep}`;
 const dayMonth = iso => iso ? new Date(iso.slice(0, 10) + 'T00:00:00')
   .toLocaleDateString('en-GB', {day: 'numeric', month: 'short'}) : '';
 const hhmm = iso => (iso || '').slice(11, 16);
+// Local times throughout, read the same way, so differences are honest
+// within a time zone and off by the zone gap across one - as the airline
+// prints them.
+const ms = iso => Date.parse(iso.slice(0, 16) + ':00Z');
+const hours = h => {
+  if (h == null) return '--';
+  let d = Math.floor(h / 24), r = Math.round(h % 24);
+  if (r === 24) { d += 1; r = 0; }
+  return d > 0 ? `${d}d ${r}h` : `${r}h`;
+};
+const dur = m => m == null ? '' : `${Math.floor(m / 60)}h ${String(m % 60).padStart(2, '0')}m`;
+const cityName = c => ((typeof D !== 'undefined' && D && D.airports) || {})[c] || c;
 
-function boardRows(p) {
+// A picked fare's times. Older payloads carry no arrival date: then it is
+// the departure day, or the next one when it lands "earlier" than it left.
+function fareTimes(o) {
+  const dep = `${o.date}T${o.dep}`;
+  let arr = o.arr_iso;
+  if (!arr) {
+    arr = `${o.date}T${o.arr}`;
+    if (o.arr < o.dep) arr = new Date(ms(arr) + 86400000).toISOString().slice(0, 16);
+  }
+  return {dep, arr};
+}
+
+// ---------- what the board is made of -------------------------------------
+
+function boardModel(p) {
   const trips = (typeof D !== 'undefined' && D && D.trips) || [];
   const trip = trips.find(t => t.plan_id === p.id);
   const expanded = trip ? trip.legs : [];
   const section = ((PRICES && PRICES.plans) || []).find(s => s.plan_id === p.id);
-  const unfixed = new Set(p.unfixed || []);
+  const priced = section ? section.legs : [];
   const people = Object.fromEntries(p.travellers.map(t =>
     [t.key, (t.adults || 0) + (t.children || 0) || 1]));
-  // Matched by route and traveller, not by leg name. The trips data is built
-  // in the cloud from the plan as it was at the last sync, so right after
-  // the plan is edited its leg names can differ - SGN-PQC merged into one
-  // leg for three groups showed two of them as unbooked. A ticket for that
-  // traveller on that route is that leg, however the plan names it.
-  const sameRoute = (x, l) => x.origin === l.from && x.destination === l.to;
-  return p.legs.map(l => {
-    const booked = [];
-    (l.who || []).forEach(k => {
-      const got = expanded.find(x => sameRoute(x, l) && x.group === k && x.booked);
-      if (got) booked.push(got);
+  const hue = Object.fromEntries(p.travellers.map((t, i) => [t.key, HUES[i % HUES.length]]));
+
+  // Matched by route and traveller, not by leg name: the trips data is built
+  // in the cloud from the plan as it was at the last sync, so right after an
+  // edit the names can differ. A ticket for that traveller on that route is
+  // that leg - the one inside the leg's dates, if the route is flown twice.
+  const ticket = (l, k) => {
+    const all = expanded.filter(x => x.booked && x.group === k
+      && x.origin === l.from && x.destination === l.to);
+    return (all.find(x => (l.dates || []).includes((x.booked.depart || '').slice(0, 10)))
+            || all[0] || {}).booked || null;
+  };
+  const legs = p.legs.map((l, i) => {
+    const fares = priced.find(x => x.plan_leg === l.key && (x.options || []).length)
+      || priced.find(x => x.origin === l.from && x.destination === l.to
+                          && (x.options || []).length);
+    return {
+      leg: l, order: i,
+      first: (l.dates || []).slice().sort()[0] || '',
+      tickets: Object.fromEntries((l.who || []).map(k => [k, ticket(l, k)])),
+      options: (fares && fares.options) || [],
+    };
+  }).sort((a, b) => a.first.localeCompare(b.first) || a.order - b.order);
+  return {legs, people, hue};
+}
+
+function unfixedIn(p, b) {
+  return new Set([...(p.unfixed || []), ...(b.unfixed || [])]);
+}
+
+function isFixed(p, b, m, k) {
+  if (!m.tickets[k]) return false;
+  const u = unfixedIn(p, b);
+  return !u.has(m.leg.key) && !u.has(`${m.leg.key}@${k}`);
+}
+
+// Who on a leg still needs a seat in this bundle.
+const needs = (p, b, m) => (m.leg.who || []).filter(k => !isFixed(p, b, m, k));
+
+const pickOf = (b, m) => m.options.find(o => sig(o) === (b.picks || {})[m.leg.key]) || null;
+
+// ---------- a bundle, added up --------------------------------------------
+
+function analyse(p, M, b) {
+  const paidFor = new Set();
+  let paid = 0, toBook = 0, toPick = 0;
+  const per = Object.fromEntries(p.travellers.map(t => [t.key, {steps: [], flags: []}]));
+
+  M.legs.forEach(m => {
+    const open = needs(p, b, m);
+    const o = open.length ? pickOf(b, m) : null;
+    if (open.length) {
+      if (o) toBook += o.pp * open.reduce((n, k) => n + (M.people[k] || 1), 0);
+      else toPick++;
+    }
+    (m.leg.who || []).forEach(k => {
+      if (!per[k]) return;
+      if (isFixed(p, b, m, k)) {
+        const t = m.tickets[k];
+        // One ticket can carry several people and legs: paid once.
+        if (!paidFor.has(t.booking_id)) {
+          paidFor.add(t.booking_id);
+          paid += inr(t.paid, t.currency);
+        }
+        per[k].steps.push({m, from: m.leg.from, to: m.leg.to, dep: t.depart, arr: t.arrive,
+                           what: `${t.airline} ${t.flight_no || ''}`.trim(), kind: 'booked'});
+      } else if (o) {
+        const {dep, arr} = fareTimes(o);
+        per[k].steps.push({m, from: m.leg.from, to: m.leg.to, dep, arr,
+                           what: o.airline, kind: 'picked'});
+      } else {
+        per[k].missing = (per[k].missing || 0) + 1;
+      }
     });
-    const isUnfixed = unfixed.has(l.key);
-    const needs = (l.who || []).filter(k =>
-      isUnfixed || !booked.some(x => x.group === k));
-    const legs = section ? section.legs : [];
-    const priced = legs.find(x => x.plan_leg === l.key)
-      || legs.find(x => x.origin === l.from && x.destination === l.to);
-    return {leg: l, booked, needs, unfixed: isUnfixed,
-            seats: needs.reduce((n, k) => n + (people[k] || 1), 0),
-            options: (priced && priced.options) || []};
+  });
+
+  let issues = 0;
+  Object.values(per).forEach(g => {
+    g.steps = g.steps.filter(s => s.dep && s.arr).sort((a, b) => a.dep.localeCompare(b.dep));
+    g.stays = [];
+    g.steps.forEach((s, i) => {
+      const next = g.steps[i + 1];
+      if (!next) return;
+      const gap = (ms(next.dep) - ms(s.arr)) / 3600000;
+      if (gap < 0) g.flags.push({k: 'bad', t: `leaves ${next.from} before landing there`});
+      else if (gap < 3 && s.kind !== next.kind)
+        g.flags.push({k: 'warn', t: `${gap.toFixed(1)}h to connect at ${s.to}, separate tickets`});
+      if (next.from !== s.to)
+        g.flags.push({k: 'warn', t: `lands in ${s.to}, next flight leaves ${next.from}`});
+      if (gap > 0) g.stays.push({city: s.to, a: s.arr, b: next.dep, h: gap});
+    });
+    issues += g.flags.filter(f => f.k === 'bad').length;
+  });
+  return {paid, toBook, total: paid + toBook, toPick, per, issues,
+          complete: toPick === 0};
+}
+
+// ---------- auto-fill -----------------------------------------------------
+
+// The cheapest set that hangs together: legs in date order, each the
+// cheapest fare that leaves at least two hours after everyone on it has
+// landed from their previous flight, and lands two hours before their next
+// booked one leaves. Where nothing fits, the cheapest regardless - and the
+// bundle shows the clash rather than hiding the leg.
+function autofill(p, M, b) {
+  b.picks = {};
+  M.legs.forEach(m => {
+    const open = needs(p, b, m);
+    if (!open.length || !m.options.length) return;
+    const A = analyse(p, M, b);
+    const fits = o => {
+      const {dep, arr} = fareTimes(o);
+      return open.every(k => {
+        const steps = A.per[k].steps;
+        const before = steps.filter(s => s.m.order !== m.order && s.m.first <= m.first);
+        const after = steps.filter(s => s.kind === 'booked' && s.m.first > m.first);
+        const landed = Math.max(-Infinity, ...before.map(s => ms(s.arr)));
+        const leaves = Math.min(Infinity, ...after.map(s => ms(s.dep)));
+        return ms(dep) >= landed + 7200000 && ms(arr) <= leaves - 7200000;
+      });
+    };
+    const byPrice = m.options.slice().sort((x, y) => x.pp - y.pp);
+    const o = byPrice.find(fits) || byPrice[0];
+    b.picks[m.leg.key] = sig(o);
   });
 }
 
-function bundlesOf(p, rows) {
-  if (!p.bundles || !p.bundles.length)
-    p.bundles = [{id: 'b' + Date.now(), name: 'Cheapest', picks: {}}];
+function bundlesOf(p, M) {
+  if (!p.bundles || !p.bundles.length) {
+    const b = {id: 'b' + Date.now(), name: 'Cheapest', picks: {}, unfixed: []};
+    autofill(p, M, b);
+    p.bundles = [b];
+  }
+  p.bundles.forEach(b => {
+    b.unfixed = b.unfixed || [];
+    // A bundle with nothing picked starts from the cheapest set rather than
+    // a column of empty slots.
+    if (!b.picks || !Object.keys(b.picks).length) autofill(p, M, b);
+  });
   if (ACTIVE_BUNDLE >= p.bundles.length) ACTIVE_BUNDLE = 0;
-  // A bundle starts from the cheapest fare on any leg it has not chosen.
-  p.bundles.forEach(b => rows.forEach(r => {
-    if (r.needs.length && r.options.length && !b.picks[r.leg.key])
-      b.picks[r.leg.key] = sig(r.options[0]);
-  }));
   return p.bundles;
 }
 
-function totals(rows, b) {
-  const paidFor = new Set();
-  let paid = 0, picked = 0, unpicked = 0;
-  rows.forEach(r => {
-    r.booked.forEach(x => {
-      if (paidFor.has(x.booked.booking_id)) return;   // one ticket, several legs
-      paidFor.add(x.booked.booking_id);
-      paid += inr(x.booked.paid, x.booked.currency);
-    });
-    if (!r.needs.length) return;
-    const o = r.options.find(o => sig(o) === b.picks[r.leg.key]);
-    if (o) picked += o.pp * r.seats; else unpicked++;
-  });
-  return {paid, picked, total: paid + picked, unpicked};
-}
-
-function travellerNames(p, keys) {
-  return keys.map(k => (p.travellers.find(t => t.key === k) || {label: k}).label)
-    .join(', ');
-}
+// ---------- drawing -------------------------------------------------------
 
 function renderBoard(p) {
-  if (!p.legs.length) return '';
-  const rows = boardRows(p);
-  const bundles = bundlesOf(p, rows);
-  const active = bundles[ACTIVE_BUNDLE];
-
-  const chips = bundles.map((b, i) => {
-    const t = totals(rows, b);
-    return `<button class="bchip ${i === ACTIVE_BUNDLE ? 'on' : ''}" data-bundle="${i}">
-      <b>${esc(b.name)}</b> ${rupees(t.total)}
-      ${t.unpicked ? `<span class="dim">· ${t.unpicked} unpriced</span>` : ''}</button>`;
-  }).join('');
-  const t = totals(rows, active);
-  const body = rows.map((r, i) => renderBoardRow(p, r, i, active)).join('');
-
-  return `<section class="board">
-    <h3>Board <small>booked legs are fixed; choose the rest</small></h3>
-    <div class="bchips">${chips}
-      <button class="linkbtn" id="b-new">+ Bundle</button>
-      <button class="linkbtn" id="b-rename">Rename</button>
-      ${bundles.length > 1 ? '<button class="linkbtn" id="b-del">Remove</button>' : ''}
+  if (!p.legs.length || !p.travellers.length) return '';
+  const M = boardModel(p);
+  const bundles = bundlesOf(p, M);
+  const A = bundles.map(b => analyse(p, M, b));
+  if (FOCUS && (!bundles[FOCUS.bundle] || !M.legs.some(m => m.leg.key === FOCUS.leg)))
+    FOCUS = null;
+  return `<section class="board" id="board">
+    <h3>Bundles <small>booked flights are fixed 🔒 · click an open slot, then pick
+      a flight from the list on the left</small></h3>
+    ${renderCompare(p, bundles, A)}
+    ${renderGantt(p, M, bundles[ACTIVE_BUNDLE], A[ACTIVE_BUNDLE])}
+    <div class="bgrid">
+      <aside class="poolpanel">${renderPool(p, M, bundles)}</aside>
+      <div class="bundles" id="bundlecols">
+        ${bundles.map((b, i) => renderBundle(p, M, b, i, A[i])).join('')}
+      </div>
     </div>
-    <p class="btotal">${esc(active.name)}: <b>${rupees(t.total)}</b>
-      <span class="dim">= ${rupees(t.paid)} paid + ${rupees(t.picked)} to book${
-        t.unpicked ? ` · ${t.unpicked} leg(s) without fares yet` : ''}</span></p>
-    ${body}
-    ${renderTimeline(p, rows, active)}
   </section>`;
 }
 
-function renderBoardRow(p, r, i, active) {
-  const l = r.leg;
-  const d = (l.dates || []).slice().sort();
-  const span = d.length > 1 ? `${dayMonth(d[0])}–${dayMonth(d[d.length - 1])}`
-                            : dayMonth(d[0]);
-  // One line per ticket, with everyone on it - a booking for four is one
-  // ticket, not four.
-  const byTicket = new Map();
-  r.booked.forEach(x => {
-    const t = byTicket.get(x.booked.booking_id) || {b: x.booked, who: []};
-    t.who.push(x.label);
-    byTicket.set(x.booked.booking_id, t);
-  });
-  const tickets = [...byTicket.values()].map(({b, who}) =>
-    `<div class="bticket ${r.unfixed ? 'struck' : ''}">
-      <span title="Booked">🔒</span> <b>${esc(b.airline)} ${esc(b.flight_no)}</b>
-      · ${dayMonth(b.depart)} ${hhmm(b.depart)}–${hhmm(b.arrive)}
-      · ${esc(who.join(', '))} · <code>${esc(b.pnr || '')}</code></div>`).join('');
-  const toggle = r.booked.length
-    ? `<button class="linkbtn" data-unfix="${esc(l.key)}"
-         title="${r.unfixed ? 'Treat the booked ticket as fixed again'
-                            : 'Price this leg as if it were open, to compare'}">${
-         r.unfixed ? 'fix again' : 'unfix'}</button>` : '';
+function refTotal(p, bundles, A, i) {
+  const base = bundles.findIndex(b => b.id === p.base_bundle);
+  return base >= 0 && base !== i ? {name: bundles[base].name, total: A[base].total} : null;
+}
 
-  let choice = '';
-  if (r.needs.length) {
-    choice = r.options.length
-      ? `<div class="bopts">${r.options.map(o => {
-          const s = sig(o), on = active.picks[l.key] === s;
-          return `<label class="bopt ${on ? 'on' : ''}">
-            <input type="radio" name="pick-${i}" data-pick="${esc(l.key)}"
-              value="${esc(s)}" ${on ? 'checked' : ''}>
-            <span class="bdate">${dayMonth(o.date)}</span>
-            <span class="bair">${esc(o.airline)} <span class="dim">${esc(o.dep)}–${esc(o.arr)}
-              · ${o.stops ? o.stops + ' stop' : 'nonstop'}</span></span>
-            <span class="num">${rupees(o.pp)}${r.seats > 1
-              ? ` <span class="dim">× ${r.seats} = ${rupees(o.pp * r.seats)}</span>` : ''}</span>
-          </label>`;
-        }).join('')}</div>`
-      : `<p class="dim small">No fares yet — ${r.unfixed ? 'an unfixed leg'
-          : 'this leg'} is priced at the next price check.</p>`;
-  }
+function renderCompare(p, bundles, A) {
+  const done = A.filter(a => a.complete).map(a => a.total);
+  const best = done.length ? Math.min(...done) : null;
+  const cards = bundles.map((b, i) => {
+    const a = A[i], ref = refTotal(p, bundles, A, i);
+    const isBest = bundles.length > 1 && a.complete && a.total === best
+      && done.filter(t => t === best).length === 1;
+    const d = ref ? a.total - ref.total : 0;
+    const delta = !a.complete ? `<span class="warn">${a.toPick} leg${a.toPick > 1 ? 's' : ''} to pick</span>`
+      : !ref ? '' : d === 0 ? `<span class="dim">same as ${esc(ref.name)}</span>`
+      : `<span class="${d < 0 ? 'good' : 'bad'}">${d < 0 ? '▼' : '▲'} ${rupees(Math.abs(d))}</span>
+         <span class="dim">vs ${esc(ref.name)}</span>`;
+    return `<button class="cmpcard ${i === ACTIVE_BUNDLE ? 'on' : ''} ${isBest ? 'best' : ''}"
+        data-pickbundle="${i}" type="button">
+      <span class="cmpname">${esc(b.name)}
+        ${b.id === p.base_bundle ? '<span class="tag good">base</span>' : ''}
+        ${isBest ? '<span class="tag good">cheapest</span>' : ''}
+        ${a.issues ? `<span class="tag bad">${a.issues} issue${a.issues > 1 ? 's' : ''}</span>` : ''}</span>
+      <span class="cmptot">${rupees(a.total)}</span>
+      <span class="cmpdelta">${delta}</span>
+      <span class="cmpstats">
+        <span class="cmpstat"><b>${rupees(a.paid)}</b>paid</span>
+        <span class="cmpstat"><b>${rupees(a.toBook)}</b>to book</span>
+        <span class="cmpstat"><b>${(b.unfixed || []).length}</b>unfixed</span>
+      </span></button>`;
+  }).join('');
+  return `<div class="cmp">${cards}
+    <button class="miniact" id="b-new" title="A new bundle, starting from the one selected">+ Bundle</button></div>`;
+}
 
-  const state = !r.needs.length ? 'fixed'
-              : r.booked.length && !r.unfixed ? 'part' : 'open';
-  return `<div class="brow ${state}">
-    <div class="bleg"><b>${esc(l.from)} → ${esc(l.to)}</b>
-      <span class="dim">${esc(travellerNames(p, l.who || []))} · ${span}</span>
-      ${state === 'fixed' ? '<span class="pill ok">booked</span>' : ''}
-      ${r.unfixed ? '<span class="pill open">unfixed</span>' : ''}
-      ${state === 'part' ? `<span class="pill open">to book for ${
-        esc(travellerNames(p, r.needs))}</span>` : ''}
-      ${toggle}</div>
-    ${tickets}${choice}
+function renderBundle(p, M, b, bi, a) {
+  const ref = refTotal(p, p.bundles, p.bundles.map(x => analyse(p, M, x)), bi);
+  const blocks = p.travellers.map(t => {
+    const g = a.per[t.key];
+    const slots = M.legs.filter(m => (m.leg.who || []).includes(t.key))
+      .map(m => renderSlot(p, M, b, bi, m, t.key)).join('');
+    if (!slots) return '';
+    const stays = g.stays.filter(s => s.h >= 6)
+      .map(s => `${esc(s.city)} ${hours(s.h)}`).join(' · ');
+    const tags = k => g.flags.filter(f => f.k === k)
+      .map(f => `<span class="tag ${k}">${esc(f.t)}</span>`).join('');
+    return `<div class="gblock">
+      <div class="glabel"><span class="dot" style="background:${M.hue[t.key]}"></span>
+        ${esc(t.label)} <span class="dim">· ${M.people[t.key]}p</span>
+        <span class="hrs">${stays}</span></div>
+      ${slots}
+      ${tags('bad') || tags('warn') ? `<div class="tags">${tags('bad')}${tags('warn')}</div>` : ''}
+    </div>`;
+  }).join('');
+  const isBase = b.id === p.base_bundle;
+  return `<div class="bundle ${bi === ACTIVE_BUNDLE ? 'active' : ''}" data-bundle="${bi}">
+    <div class="bhead">
+      <input class="bname" value="${esc(b.name)}" data-rename="${bi}" title="Rename">
+      <button class="miniact" data-fill="${bi}" title="Replace the picks with the cheapest set that hangs together">Auto-fill</button>
+      <button class="miniact" data-dup="${bi}" title="A new bundle, starting from this one">Copy</button>
+      <button class="miniact" data-base="${bi}" title="Measure the other bundles against this one">${isBase ? 'Unset base' : 'Set base'}</button>
+      ${p.bundles.length > 1 ? `<button class="miniact" data-del="${bi}" title="Delete this bundle">×</button>` : ''}
+    </div>
+    <div class="btot">${rupees(a.total)}</div>
+    <div class="bsub">${rupees(a.paid)} paid + ${rupees(a.toBook)} to book
+      ${a.toPick ? ` · <span class="warn">${a.toPick} to pick</span>` : ''}
+      ${ref ? ` · ${a.total - ref.total <= 0 ? '▼' : '▲'} ${rupees(Math.abs(a.total - ref.total))} vs ${esc(ref.name)}` : ''}
+      ${a.issues ? ` · <span class="bad">${a.issues} issue${a.issues > 1 ? 's' : ''}</span>` : ''}</div>
+    ${blocks}
   </div>`;
 }
 
-// Each traveller's journey: booked flights, then the bundle's picks, in
-// order, with how long they stay between.
-function renderTimeline(p, rows, bundle) {
-  const lines = p.travellers.map(tr => {
-    const steps = [];
-    rows.forEach(r => {
-      if (!(r.leg.who || []).includes(tr.key)) return;
-      const b = r.booked.find(x => x.group === tr.key);
-      if (b && !r.unfixed) {
-        steps.push({at: b.booked.depart, end: b.booked.arrive, from: r.leg.from,
-                    to: r.leg.to, what: `${b.booked.airline} ${b.booked.flight_no}`,
-                    kind: 'booked'});
-        return;
-      }
-      const o = r.options.find(o => sig(o) === bundle.picks[r.leg.key]);
-      steps.push(o
-        ? {at: `${o.date}T${o.dep}`, end: '', from: r.leg.from, to: r.leg.to,
-           what: o.airline, kind: 'picked'}
-        : {at: (r.leg.dates || [])[0] || '', end: '', from: r.leg.from,
-           to: r.leg.to, what: 'not chosen', kind: 'open'});
-    });
-    steps.sort((a, b) => a.at.localeCompare(b.at));
-    const parts = [];
-    steps.forEach((s, i) => {
-      parts.push(`<span class="tstep ${s.kind}">${esc(s.from)}→${esc(s.to)}
-        ${dayMonth(s.at)}${s.at.length > 10 ? ' ' + hhmm(s.at) : ''}
-        <span class="dim">${esc(s.what)}</span></span>`);
-      const next = steps[i + 1];
-      if (!next) return;
-      const from = (s.end || s.at).slice(0, 10), to = next.at.slice(0, 10);
-      const nights = Math.round((new Date(to) - new Date(from)) / 86400000);
-      if (nights > 0)
-        parts.push(`<span class="tstay">${nights} night${nights > 1 ? 's' : ''} in
-          ${esc(((typeof D !== 'undefined' && D && D.airports) || {})[s.to] || s.to)}</span>`);
-    });
-    return `<div class="tline"><b>${esc(tr.label)}</b>${parts.join('')}</div>`;
-  }).join('');
-  return `<h3>Timeline <small>booked flights, then this bundle's picks</small></h3>
-    <div class="timeline">${lines}</div>`;
+function renderSlot(p, M, b, bi, m, k) {
+  const l = m.leg, route = `${esc(l.from)} → ${esc(l.to)}`;
+  const t = m.tickets[k];
+  const ticketLine = t => `${esc(t.airline)} ${esc(t.flight_no || '')} · ${dayMonth(t.depart)}
+    ${hhmm(t.depart)}→${hhmm(t.arrive)}${t.pnr ? ` · <code>${esc(t.pnr)}</code>` : ''}`;
+  if (isFixed(p, b, m, k)) {
+    return `<div class="slot fixed">
+      <span class="sk">🔒 ${route}</span>
+      <span class="sx" data-unfix="${bi}|${esc(l.key)}|${esc(k)}"
+        title="Take this ticket off fixed in this bundle, to see what replacing it costs">unfix</span>
+      <br><span class="sv">${ticketLine(t)}</span></div>`;
+  }
+  const o = pickOf(b, m);
+  const open = needs(p, b, m);
+  const focused = FOCUS && FOCUS.bundle === bi && FOCUS.leg === l.key;
+  const others = open.filter(x => x !== k);
+  const withWhom = others.length ? ` <span class="dim">with ${esc(others.map(x =>
+    (p.travellers.find(t => t.key === x) || {label: x}).label).join(', '))}</span>` : '';
+  const head = `<span class="sk">${route}</span>${withWhom}
+    ${t ? `<span class="sx" data-unfix="${bi}|${esc(l.key)}|${esc(k)}" title="Keep the booked ticket">fix again</span>` : ''}
+    ${o ? `<span class="sx" data-clear="${bi}|${esc(l.key)}" title="Clear this pick">×</span>` : ''}`;
+  const body = o
+    ? (() => { const {arr} = fareTimes(o);
+        return `${esc(o.airline)} · ${dayMonth(o.date)} ${esc(o.dep)}→${esc(o.arr)}${
+          arr.slice(0, 10) > o.date ? '<sup>+1</sup>' : ''} · ${rupees(o.pp)}/pp`; })()
+    : m.options.length ? '<span class="dim">empty — click, then pick a flight</span>'
+    : '<span class="dim">no fares yet — the next price check finds some</span>';
+  return `<div class="slot ${o ? 'filled' : ''} ${focused ? 'focused' : ''} ${t ? 'unfixed' : ''}"
+      data-slot="${bi}|${esc(l.key)}|${esc(k)}" role="button" tabindex="0">
+    ${head}
+    ${t ? `<br><span class="sv struck">🔒 ${ticketLine(t)}</span>` : ''}
+    <br><span class="sv">${body}</span></div>`;
 }
 
-function wireBoard(host) {
+// ---------- the fares for the slot in focus -------------------------------
+
+function poolRows(p, M) {
+  const m = M.legs.find(x => x.leg.key === FOCUS.leg);
+  const f = FILTERS, maxP = +f.maxPrice || 0;
+  const rows = m.options.filter(o =>
+    (!f.date || o.date === f.date)
+    && (f.stops === '' || o.stops <= +f.stops)
+    && (!maxP || o.pp <= maxP)
+    && (!f.airline || o.airline.toLowerCase().includes(f.airline.toLowerCase())));
+  const key = {price: o => o.pp, depart: o => fareTimes(o).dep,
+               arrive: o => fareTimes(o).arr, duration: o => o.duration || 0}[f.sort];
+  return {m, rows: rows.sort((a, b) => key(a) < key(b) ? -1 : key(a) > key(b) ? 1 : a.pp - b.pp)};
+}
+
+function renderPool(p, M, bundles) {
+  if (!FOCUS) {
+    return `<p class="sectitle">Flights</p>
+      <p class="empty">Click an open <b>slot</b> in a bundle on the right - the
+      flights that can fill it show here. Click one to put it in the bundle, or
+      drag it onto the slot.</p>`;
+  }
+  const b = bundles[FOCUS.bundle];
+  const m = M.legs.find(x => x.leg.key === FOCUS.leg);
+  const open = needs(p, b, m);
+  const seats = open.reduce((n, k) => n + (M.people[k] || 1), 0);
+  const dates = [...new Set(m.options.map(o => o.date))].sort();
+  if (FILTERS.date && !dates.includes(FILTERS.date)) FILTERS.date = '';
+  const names = open.map(k => (p.travellers.find(t => t.key === k) || {label: k}).label);
+  const sel = (name, opts) => `<select data-filter="${name}">${opts.map(([v, t]) =>
+    `<option value="${esc(v)}" ${String(FILTERS[name]) === String(v) ? 'selected' : ''}>${esc(t)}</option>`).join('')}</select>`;
+  return `<p class="slotname"><b>${esc(names.join(', '))}</b> · ${esc(m.leg.from)} → ${esc(m.leg.to)}
+      · ${seats} seat${seats > 1 ? 's' : ''} · into <b>${esc(b.name)}</b></p>
+    <div class="filters">
+      <div class="frow">
+        <span><label>Date</label>${sel('date', [['', 'any'], ...dates.map(d => [d, dayMonth(d)])])}</span>
+        <span><label>Stops</label>${sel('stops', [['', 'any'], ['0', 'nonstop'], ['1', 'up to 1']])}</span>
+        <span><label>Sort</label>${sel('sort', [['price', 'price'], ['depart', 'departs'],
+                                                ['arrive', 'arrives'], ['duration', 'duration']])}</span>
+      </div>
+      <div class="frow">
+        <span><label>Max ₹/person</label><input type="number" step="1000" data-filter="maxPrice"
+          value="${esc(FILTERS.maxPrice)}" placeholder="any"></span>
+        <span class="wide"><label>Airline</label><input data-filter="airline"
+          value="${esc(FILTERS.airline)}" placeholder="e.g. Vietjet"></span>
+      </div>
+    </div>
+    <div class="poolscroll" id="poolcards">${renderPoolCards(p, M, bundles)}</div>`;
+}
+
+function renderPoolCards(p, M, bundles) {
+  const b = bundles[FOCUS.bundle];
+  const {m, rows} = poolRows(p, M);
+  const open = needs(p, b, m);
+  const seats = open.reduce((n, k) => n + (M.people[k] || 1), 0);
+  if (!m.options.length)
+    return `<p class="empty">No fares for ${esc(m.leg.from)} → ${esc(m.leg.to)} yet.
+      Save the plan; the next price check searches it.</p>`;
+  if (!rows.length) return '<p class="empty">Nothing matches the filters.</p>';
+  // Would this fare clash with the traveller's other flights in this bundle?
+  const others = analyse(p, M, Object.assign({}, b, {picks: Object.assign({}, b.picks,
+    {[m.leg.key]: ''})}));
+  const clash = o => {
+    const {dep, arr} = fareTimes(o);
+    for (const k of open) {
+      for (const s of others.per[k].steps) {
+        if (s.m.first <= m.first && ms(s.arr) > ms(dep)) return `leaves before ${s.from}→${s.to} lands`;
+        if (s.m.first > m.first && ms(s.dep) < ms(arr)) return `lands after ${s.from}→${s.to} leaves`;
+      }
+    }
+    return '';
+  };
+  const chosen = b.picks[m.leg.key];
+  return rows.map(o => {
+    const s = sig(o), {arr} = fareTimes(o), c = clash(o);
+    const tags = [`<span class="tag">${o.stops ? o.stops + ' stop' + (o.stops > 1 ? 's' : '') : 'nonstop'}</span>`];
+    if (o.lay) tags.push(`<span class="tag ${o.lay > 360 ? 'warn' : ''}">layover ${dur(o.lay)}</span>`);
+    if (arr.slice(0, 10) > o.date) tags.push('<span class="tag warn">lands next day</span>');
+    if (c) tags.push(`<span class="tag bad">${esc(c)}</span>`);
+    if (s === chosen) tags.push('<span class="tag good">in this bundle</span>');
+    return `<div class="fcard ${s === chosen ? 'on' : ''}" draggable="true" data-fare="${esc(s)}">
+      <div class="top"><span class="air">${esc(o.airline)}</span>
+        <span class="pr">${rupees(o.pp)}<span class="dim">/pp</span></span></div>
+      <div class="mid">${dayMonth(o.date)} ${esc(o.dep)} → ${esc(o.arr)}
+        ${o.duration ? ' · ' + dur(o.duration) : ''}
+        ${seats > 1 ? ` · <span class="dim">${rupees(o.pp * seats)} for ${seats}</span>` : ''}</div>
+      <div class="tags">${tags.join('')}</div></div>`;
+  }).join('');
+}
+
+// ---------- the timeline --------------------------------------------------
+
+function renderGantt(p, M, b, a) {
+  const rows = p.travellers.map(t => {
+    const g = a.per[t.key];
+    return {t, bars: [
+      ...g.steps.map(s => ({a: ms(s.dep), b: ms(s.arr), cls: 'transit ' + s.kind,
+                            label: `${s.from}→${s.to} ${hhmm(s.dep)} ${s.what}`})),
+      ...g.stays.map(s => ({a: ms(s.a), b: ms(s.b), cls: 'stay', city: s.city,
+                            label: `${s.city} ${hours(s.h)}`})),
+    ]};
+  }).filter(r => r.bars.length);
+  const all = rows.flatMap(r => r.bars);
+  if (!all.length) return '';
+  const t0 = Math.min(...all.map(x => x.a)), t1 = Math.max(...all.map(x => x.b));
+  const span = Math.max(t1 - t0, 1), pct = v => ((v - t0) / span * 100).toFixed(2);
+  const cities = [...new Set(all.filter(x => x.city).map(x => x.city))];
+  const colour = c => HUES[cities.indexOf(c) % HUES.length];
+  const ticks = [];
+  for (let x = Math.ceil(t0 / 86400000) * 86400000; x <= t1; x += 86400000)
+    ticks.push(`<span class="tick" style="left:${pct(x)}%">${dayMonth(new Date(x).toISOString())}</span>`);
+  return `<p class="sectitle">Timeline — ${esc(b.name)}</p>
+    <div class="tlwrap"><div class="tl">
+      <div class="tlaxis"><div></div><div class="ticks">${ticks.join('')}</div></div>
+      ${rows.map(r => `<div class="tlrow"><div class="tlname">${esc(r.t.label)}</div>
+        <div class="tltrack">${r.bars.map(x => {
+          const w = Math.max(+pct(x.b) - +pct(x.a), 0.4);
+          return `<div class="bar ${x.cls}" style="left:${pct(x.a)}%;width:${w.toFixed(2)}%${
+            x.city ? `;background:${colour(x.city)}` : ''}" title="${esc(x.label)}">${
+            w > 6 ? esc(x.label) : ''}</div>`;
+        }).join('')}</div></div>`).join('')}
+    </div></div>
+    <div class="tlkey">${cities.map(c => `<span><i style="background:${colour(c)}"></i>in ${esc(cityName(c))}</span>`).join('')}
+      <span><i class="k-booked"></i>booked flight</span><span><i class="k-picked"></i>picked flight</span></div>`;
+}
+
+// ---------- events --------------------------------------------------------
+
+// Redraw just the board: the editor above keeps its focus and typing, and
+// the fare list and bundle columns keep where they were scrolled to.
+function redrawBoard() {
+  const old = document.getElementById('board');
+  if (!old) { renderEditor(); return; }
+  const pool = old.querySelector('.poolscroll'), cols = old.querySelector('#bundlecols');
+  const keep = {pool: pool ? pool.scrollTop : 0, cols: cols ? cols.scrollLeft : 0};
+  const tmp = document.createElement('div');
+  tmp.innerHTML = renderBoard(EDIT);
+  const fresh = tmp.firstElementChild;
+  if (!fresh) { old.remove(); return; }
+  old.replaceWith(fresh);
+  const np = fresh.querySelector('.poolscroll'), nc = fresh.querySelector('#bundlecols');
+  if (np) np.scrollTop = keep.pool;
+  if (nc) nc.scrollLeft = keep.cols;
+  wireBoard(fresh);
+}
+
+function wireBoard(host, dirty) {
+  const board = host.id === 'board' ? host : host.querySelector('#board');
+  if (!board) return;
   const p = EDIT;
-  const redraw = () => { EDIT_DIRTY = true; renderEditor(); };
-  host.querySelectorAll('[data-bundle]').forEach(b => b.onclick = () => {
-    collectEditor(); ACTIVE_BUNDLE = +b.dataset.bundle; renderEditor(); });
-  host.querySelectorAll('[data-pick]').forEach(r => r.onchange = () => {
-    collectEditor();
-    p.bundles[ACTIVE_BUNDLE].picks[r.dataset.pick] = r.value;
-    redraw();
+  const changed = () => {
+    EDIT_DIRTY = true;
+    const msg = document.getElementById('pl-msg');
+    if (msg) msg.textContent = 'Unsaved changes.';
+    redrawBoard();
+  };
+  const M = () => boardModel(p);
+
+  board.addEventListener('click', e => {
+    const on = sel => e.target.closest(sel);
+    let el;
+    if ((el = on('[data-unfix]'))) {
+      const [bi, leg, k] = el.dataset.unfix.split('|'), b = p.bundles[+bi];
+      const key = `${leg}@${k}`;
+      const u = new Set(b.unfixed || []);
+      if (u.has(key) || u.has(leg)) { u.delete(key); u.delete(leg); }
+      else u.add(key);
+      b.unfixed = [...u];
+      // Someone on the leg now needs a seat: show the fares for it.
+      ACTIVE_BUNDLE = +bi;
+      FOCUS = u.has(key) ? {bundle: +bi, leg, trav: k} : FOCUS;
+      return changed();
+    }
+    if ((el = on('[data-clear]'))) {
+      const [bi, leg] = el.dataset.clear.split('|');
+      delete p.bundles[+bi].picks[leg];
+      return changed();
+    }
+    if ((el = on('[data-fill]'))) {
+      ACTIVE_BUNDLE = +el.dataset.fill;
+      autofill(p, M(), p.bundles[ACTIVE_BUNDLE]);
+      return changed();
+    }
+    if ((el = on('[data-dup]'))) {
+      const src = p.bundles[+el.dataset.dup];
+      p.bundles.push(Object.assign(clone(src), {id: 'b' + Date.now(), name: src.name + ' (copy)'}));
+      ACTIVE_BUNDLE = p.bundles.length - 1;
+      return changed();
+    }
+    if ((el = on('#b-new'))) {
+      const src = p.bundles[ACTIVE_BUNDLE];
+      p.bundles.push({id: 'b' + Date.now(), name: `Bundle ${p.bundles.length + 1}`,
+                      picks: Object.assign({}, src.picks), unfixed: (src.unfixed || []).slice()});
+      ACTIVE_BUNDLE = p.bundles.length - 1;
+      return changed();
+    }
+    if ((el = on('[data-base]'))) {
+      const b = p.bundles[+el.dataset.base];
+      p.base_bundle = p.base_bundle === b.id ? '' : b.id;
+      return changed();
+    }
+    if ((el = on('[data-del]'))) {
+      const b = p.bundles[+el.dataset.del];
+      if (!confirm(`Delete the bundle "${b.name}"?`)) return;
+      p.bundles.splice(+el.dataset.del, 1);
+      ACTIVE_BUNDLE = 0; FOCUS = null;
+      return changed();
+    }
+    if ((el = on('[data-fare]'))) {
+      if (!FOCUS) return;
+      p.bundles[FOCUS.bundle].picks[FOCUS.leg] = el.dataset.fare;
+      return changed();
+    }
+    if ((el = on('[data-slot]'))) {
+      const [bi, leg, trav] = el.dataset.slot.split('|');
+      ACTIVE_BUNDLE = +bi;
+      FOCUS = {bundle: +bi, leg, trav};
+      return redrawBoard();
+    }
+    if ((el = on('[data-pickbundle]'))) {
+      ACTIVE_BUNDLE = +el.dataset.pickbundle;
+      return redrawBoard();
+    }
+    if ((el = on('[data-bundle]')) && !on('input')) {
+      if (ACTIVE_BUNDLE !== +el.dataset.bundle) {
+        ACTIVE_BUNDLE = +el.dataset.bundle;
+        redrawBoard();
+      }
+    }
   });
-  host.querySelectorAll('[data-unfix]').forEach(b => b.onclick = () => {
-    collectEditor();
-    const key = b.dataset.unfix, set = new Set(p.unfixed || []);
-    if (set.has(key)) set.delete(key); else set.add(key);
-    p.unfixed = [...set];
-    redraw();
+  board.addEventListener('keydown', e => {
+    if ((e.key === 'Enter' || e.key === ' ') && e.target.matches('[data-slot]')) {
+      e.preventDefault(); e.target.click();
+    }
   });
-  const btn = id => host.querySelector(id);
-  if (btn('#b-new')) btn('#b-new').onclick = () => {
-    collectEditor();
-    const base = p.bundles[ACTIVE_BUNDLE];
-    p.bundles.push({id: 'b' + Date.now(), name: `Bundle ${p.bundles.length + 1}`,
-                    picks: Object.assign({}, base.picks)});
-    ACTIVE_BUNDLE = p.bundles.length - 1;
-    redraw();
-  };
-  if (btn('#b-del')) btn('#b-del').onclick = () => {
-    collectEditor();
-    p.bundles.splice(ACTIVE_BUNDLE, 1);
-    ACTIVE_BUNDLE = 0;
-    redraw();
-  };
-  if (btn('#b-rename')) btn('#b-rename').onclick = () => {
-    const b = p.bundles[ACTIVE_BUNDLE];
-    const name = prompt('Name this bundle', b.name);
-    if (!name || !name.trim()) return;
-    collectEditor();
-    b.name = name.trim();
-    redraw();
-  };
+  board.addEventListener('change', e => {
+    const r = e.target.dataset.rename;
+    if (r != null) {
+      p.bundles[+r].name = e.target.value.trim() || p.bundles[+r].name;
+      changed();
+    }
+  });
+  // Filters redraw only the list, so typing in them keeps its place.
+  board.addEventListener('input', e => {
+    const f = e.target.dataset.filter;
+    if (!f || !FOCUS) return;
+    FILTERS[f] = e.target.value;
+    const list = board.querySelector('#poolcards');
+    if (list) list.innerHTML = renderPoolCards(p, M(), p.bundles);
+  });
+
+  // Drag a fare onto a slot of the same leg, in any bundle.
+  board.addEventListener('dragstart', e => {
+    const c = e.target.closest('[data-fare]');
+    if (!c || !FOCUS) return;
+    DRAG = {fare: c.dataset.fare, leg: FOCUS.leg};
+    e.dataTransfer.effectAllowed = 'copy';
+    e.dataTransfer.setData('text/plain', c.dataset.fare);
+    board.querySelectorAll('[data-slot]').forEach(s => {
+      if (s.dataset.slot.split('|')[1] === DRAG.leg) s.classList.add('valid');
+    });
+  });
+  board.addEventListener('dragend', () => {
+    DRAG = null;
+    board.querySelectorAll('.slot.valid,.slot.over').forEach(s => s.classList.remove('valid', 'over'));
+  });
+  board.addEventListener('dragover', e => {
+    const s = e.target.closest('.slot.valid');
+    if (!s) return;
+    e.preventDefault();
+    s.classList.add('over');
+  });
+  board.addEventListener('dragleave', e => {
+    const s = e.target.closest('.slot.over');
+    if (s) s.classList.remove('over');
+  });
+  board.addEventListener('drop', e => {
+    const s = e.target.closest('.slot.valid');
+    if (!s || !DRAG) return;
+    e.preventDefault();
+    const [bi, leg, trav] = s.dataset.slot.split('|');
+    p.bundles[+bi].picks[leg] = DRAG.fare;
+    ACTIVE_BUNDLE = +bi;
+    FOCUS = {bundle: +bi, leg, trav};
+    DRAG = null;
+    changed();
+  });
 }
 </script>
 </body></html>
