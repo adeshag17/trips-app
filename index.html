@@ -1614,7 +1614,7 @@ if (D) render();
 // page before the network is consulted at all.
 // ---------------------------------------------------------------------------
 
-const CFG = {"owner":"adeshag17","repo":"vietnam-flights","ref":"master","workflow":"sync-mail.yml","payload":"data/trips-payload.json","review":"data/review-payload.json","prices":"data/prices-payload.json","pool":"data/flights.json","bundles":"data/bundles.json","tracking":"data/tracking.json","pricecheck":"check-flights.yml","shell":"31"};
+const CFG = {"owner":"adeshag17","repo":"vietnam-flights","ref":"master","workflow":"sync-mail.yml","payload":"data/trips-payload.json","review":"data/review-payload.json","prices":"data/prices-payload.json","pool":"data/flights.json","bundles":"data/bundles.json","tracking":"data/tracking.json","pricecheck":"check-flights.yml","shell":"32"};
 
 const K = {token: 'ft.token', data: 'ft.payload', at: 'ft.payload.at',
            etag: 'ft.payload.etag'};
@@ -2473,7 +2473,7 @@ function trackRows() {
     rows.push(Object.assign({
       id: id, kind: 'extra', group: 'Added by you', origin: e.from, destination: e.to,
       dates: e.dates, who: [`${n} ${n === 1 ? 'person' : 'people'}`], direct: !!e.direct,
-      searches: e.dates.length * (e.direct ? 4 : 6), note: '',
+      searches: e.dates.length * (e.direct ? 2 : 6), note: '',
       // As the check decides it: more than 30 days out, once a day.
       daily: e.dates[0] > new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 10),
     }, was, {on: true, removable: true, fresh: !known.has(id)}));
