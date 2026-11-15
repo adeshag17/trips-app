@@ -651,6 +651,9 @@ button.dday:hover,.dday.on{border-color:var(--accent);background:color-mix(in sr
   border:1px solid var(--line);background:#0f1422;color:inherit;width:110px}
 .tadd input[name=from],.tadd input[name=to]{width:60px;text-transform:uppercase}
 .tadd input[name=people]{width:56px}
+
+.amulti .aonly{font-size:10.5px;margin-left:6px;opacity:.6}
+.amulti label:hover .aonly{opacity:1}
 </style>
 </head><body>
 <div id="appbar" class="appbar"><span class="as">Starting…</span></div>
@@ -1660,7 +1663,7 @@ if (D) render();
 // page before the network is consulted at all.
 // ---------------------------------------------------------------------------
 
-const CFG = {"owner":"adeshag17","repo":"vietnam-flights","ref":"master","workflow":"sync-mail.yml","payload":"data/trips-payload.json","review":"data/review-payload.json","prices":"data/prices-payload.json","pool":"data/flights.json","bundles":"data/bundles.json","tracking":"data/tracking.json","pricecheck":"check-flights.yml","shell":"33"};
+const CFG = {"owner":"adeshag17","repo":"vietnam-flights","ref":"master","workflow":"sync-mail.yml","payload":"data/trips-payload.json","review":"data/review-payload.json","prices":"data/prices-payload.json","pool":"data/flights.json","bundles":"data/bundles.json","tracking":"data/tracking.json","pricecheck":"check-flights.yml","shell":"34"};
 
 const K = {token: 'ft.token', data: 'ft.payload', at: 'ft.payload.at',
            etag: 'ft.payload.etag'};
@@ -2738,31 +2741,7 @@ function renderPrices(p) {
     ${renderTracking()}
     <p class="dim">At today's lowest fares for each open leg, checked twice a
     day. Fares are what Google Flights advertised, not quotes.</p>
-    ${body}${renderFlown(p.flown || [])}</div>`;
-}
-
-// What tracking showed once the flights flew: the lowest each one went, how
-// long before departure that was, and what was paid against it - with,
-// across all of them, when the low tends to come. Booked flights are priced
-// every check until they fly; this is the only place that shows.
-function renderFlown(list) {
-  if (!list.length) return '';
-  const befores = list.map(f => f.low_days_before).filter(n => n != null).sort((a, b) => a - b);
-  const median = befores.length ? befores[Math.floor(befores.length / 2)] : null;
-  const rows = list.map(f => `<tr>
-      <td><b>${esc(f.origin)} → ${esc(f.destination)}</b>
-        <div class="dim">${esc(f.airline)} · ${shortDate(f.date)}</div></td>
-      <td class="num">${f.paid_pp ? rupees(f.paid_pp) : '—'}</td>
-      <td class="num">${rupees(f.low_pp)}<div class="dim">${f.low_days_before} days before</div></td>
-      <td class="num">${f.paid_vs_low == null ? '' : f.paid_vs_low <= 0
-        ? '<span class="down">at or under the low</span>'
-        : `<span class="up">${rupees(f.paid_vs_low)} over</span>`}</td></tr>`).join('');
-  return `<h2 class="bookedh">What tracking showed</h2>
-    ${median != null ? `<p class="dim">Across ${list.length} flight${list.length > 1 ? 's' : ''},
-      the lowest price came a median <b>${median} days</b> before departure.</p>` : ''}
-    <div class="pcard"><table class="popts flown"><thead><tr><th>Flight</th>
-      <th class="num">Paid a seat</th><th class="num">Lowest seen</th><th></th></tr></thead>
-      <tbody>${rows}</tbody></table></div>`;
+    ${body}</div>`;
 }
 
 function renderPlanPrices(p) {
@@ -2787,7 +2766,8 @@ function renderPlanPrices(p) {
     return `<div class="pcard">
       <div class="phead"><b>${esc(l.label)}</b>
         <span>${esc(l.origin)} → ${esc(l.destination)}</span>
-        <span class="dim">${l.people} ${l.people === 1 ? 'person' : 'people'}</span></div>
+        <span class="dim">${l.people} ${l.people === 1 ? 'person' : 'people'}${
+          (l.airlines_only || []).length ? ' · ' + esc(l.airlines_only.join(', ')) + ' only' : ''}</span></div>
       <div class="pnow">${rupees(l.now_pp)}<small> /person</small>
         ${l.people > 1 ? `<span class="dim">${rupees(l.now_total)} total</span>` : ''}</div>
       <div class="pmoves">best on ${shortDate(l.best_date)} ·
@@ -3547,6 +3527,9 @@ function allowed(p, o) {
   const num = v => v === '' || v == null ? null : +v;
   const out = f.airlines_out || [];
   if (out.length && carriers(o).some(a => out.includes(a))) return false;
+  // Only these: an airline that turns up later stays out too.
+  const only = f.airlines_only || [];
+  if (only.length && !carriers(o).every(a => only.includes(a))) return false;
   if (num(f.max_stops) != null && o.stops > num(f.max_stops)) return false;
   if (num(f.max_lay_h) != null && (o.lay || 0) > num(f.max_lay_h) * 60) return false;
   if (num(f.max_dur_h) != null && o.duration && o.duration > num(f.max_dur_h) * 60) return false;
@@ -3560,6 +3543,7 @@ function allowed(p, o) {
 
 function filterSummary(f) {
   const out = [];
+  if ((f.airlines_only || []).length) out.push(`only ${f.airlines_only.join(', ')}`);
   if ((f.airlines_out || []).length) out.push(`${f.airlines_out.length} airline${f.airlines_out.length > 1 ? 's' : ''} out`);
   const span = (a, b, what) => (a !== '' && a != null) || (b !== '' && b != null)
     ? `${what} ${a !== '' && a != null ? String(a).padStart(2, '0') + ':00' : 'any'}–${b !== '' && b != null ? String(b).padStart(2, '0') + ':00' : 'any'}` : '';
@@ -3572,8 +3556,12 @@ function filterSummary(f) {
 
 function renderFareFilters(p, M) {
   const f = p.filters || {};
-  const airlines = [...new Set(M.legs.flatMap(m => m.all.flatMap(carriers)))].sort();
-  const out = new Set(f.airlines_out || []);
+  const only = new Set(f.airlines_only || []);
+  const airlines = [...new Set([...M.legs.flatMap(m => m.all.flatMap(carriers)), ...only])].sort();
+  // With "only" set, a ticked box is an airline in it; otherwise an
+  // unticked box is one left out.
+  const out = only.size ? new Set(airlines.filter(a => !only.has(a)))
+                        : new Set(f.airlines_out || []);
   const hours = (name, label) => `<span><label>${label}</label><select data-pf="${name}">
       <option value="">any</option>${Array.from({length: 24}, (_, h) =>
         `<option value="${h}" ${String(f[name]) === String(h) ? 'selected' : ''}>${String(h).padStart(2, '0')}:00</option>`).join('')}
@@ -3597,11 +3585,14 @@ function renderFareFilters(p, M) {
     </div>
     <div class="pfair"><label>Airlines</label>
       <details class="amulti" ${AIRLINES_OPEN ? 'open' : ''}>
-        <summary>${out.size ? `${airlines.length - out.size} of ${airlines.length} airlines` : `All ${airlines.length} airlines`}</summary>
+        <summary>${only.size ? `Only ${esc([...only].join(', '))}`
+          : out.size ? `${airlines.length - out.size} of ${airlines.length} airlines` : `All ${airlines.length} airlines`}</summary>
         <div class="alist">
           <label class="aall"><input type="checkbox" data-pfall ${out.size ? '' : 'checked'}> All</label>
           ${airlines.map(a => `<label><input type="checkbox" data-pfair="${esc(a)}" ${out.has(a) ? '' : 'checked'}>
-            ${esc(a)}</label>`).join('') || '<span class="dim">no fares yet</span>'}
+            ${esc(a)} <button type="button" class="linkbtn aonly" data-pfonly="${esc(a)}"
+              title="Only this airline - and any you tick after">only</button></label>`).join('')
+            || '<span class="dim">no fares yet</span>'}
         </div>
       </details>
     </div>
@@ -4075,6 +4066,12 @@ function wireBoard(host, dirty) {
       p.filters = {};
       return changed();
     }
+    if ((el = on('[data-pfonly]'))) {
+      e.preventDefault();
+      p.filters = Object.assign({}, p.filters, {airlines_only: [el.dataset.pfonly], airlines_out: []});
+      AIRLINES_OPEN = true;
+      return changed();
+    }
     if ((el = on('[data-datechip]'))) {
       FILTERS.date = FILTERS.date === el.dataset.datechip ? '' : el.dataset.datechip;
       return redrawBoard();
@@ -4114,8 +4111,13 @@ function wireBoard(host, dirty) {
     if (e.target.dataset.pfair != null || e.target.dataset.pfall != null) {
       const f = p.filters = Object.assign({}, p.filters);
       if (e.target.dataset.pfall != null) {
+        delete f.airlines_only;
         f.airlines_out = e.target.checked ? []
           : [...new Set(boardModel(p).legs.flatMap(m => m.all.flatMap(carriers)))];
+      } else if ((f.airlines_only || []).length) {
+        const only = new Set(f.airlines_only);
+        if (e.target.checked) only.add(e.target.dataset.pfair); else only.delete(e.target.dataset.pfair);
+        if (only.size) f.airlines_only = [...only]; else delete f.airlines_only;
       } else {
         const out = new Set(f.airlines_out || []);
         if (e.target.checked) out.delete(e.target.dataset.pfair); else out.add(e.target.dataset.pfair);
