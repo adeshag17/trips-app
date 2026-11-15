@@ -102,3 +102,6 @@ input.flag{border-color:var(--warn);background:var(--warnbg)}
 .log{font-family:ui-monospace,Menlo,monospace;font-size:11.5px;
  white-space:pre-wrap;color:var(--dim);margin-top:10px;max-height:160px;
  overflow:auto}
+
+.card.cancel{border-color:color-mix(in srgb,#d9534f 55%,transparent)}
+.card.cancel h3{color:#d9534f}

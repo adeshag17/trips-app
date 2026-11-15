@@ -111,7 +111,36 @@ function segmentBlock(s, i, kind){
     </div></div>`;
 }
 
+/* A vendor's cancellation: the booking as it is on file, and one question -
+   take it off the trip? Saving records the day; Keep it drops the card. */
+function cancelCard(item){
+  const b = item.booking, s = (b.segments || [])[0] || {};
+  const what = b.kind === 'hotel' ? (s.airline || 'Hotel')
+    : `${s.origin || '?'} → ${(b.segments[b.segments.length-1] || {}).destination || '?'}`;
+  const docs = (b.files || []).filter(f => f.local || f.link).map(f =>
+    `<a class="doc" target="_blank" rel="noopener"
+       href="${esc(f.link || f.local)}">${esc(f.name || 'document')} ↗</a>`).join('');
+  const paid = b.paid ? `${b.currency || ''} ${Number(b.paid).toLocaleString('en-IN')}` : '';
+  return `<div class="card cancel" data-id="${esc(item.id)}" data-class="${esc(b.kind)}">
+    <div class="head"><div class="t">
+      <h3>Cancelled: ${esc(what)}</h3>
+      <div class="sub">${esc(item.subject || '')}</div></div>
+      <span class="pill dup">cancellation</span></div>
+    <div class="body">
+      <div class="warn">${esc(b.vendor)} ${esc(b.booking_id)} · ${esc((s.depart || '').slice(0, 10))}
+        to ${esc((s.arrive || '').slice(0, 10))}${paid ? ' · ' + esc(paid) : ''}
+        ${b.trip ? ' · on ' + esc(b.trip) : ''}. Saving takes it off the trip;
+        it stays on file as cancelled on ${esc(item.cancels.on)}.</div>
+      ${docs ? `<div class="docs">${docs}</div>` : ''}
+    </div>
+    <div class="foot"><div class="sp"></div>
+      <button data-drop class="ghost">Keep it - not cancelled</button>
+      <button data-save class="primary">Mark cancelled</button>
+    </div></div>`;
+}
+
 function card(item){
+  if (item.cancels) return cancelCard(item);
   const b = item.booking;
   const kind = item.class;
   const where = b.segments && b.segments.length
@@ -186,7 +215,8 @@ function card(item){
       <label class="chk"><input type="checkbox" data-log checked>
         Log my changes to improve parsing</label>
       <div class="sp"></div>
-      <button data-drop class="ghost">Drop</button>
+      ${item.editing ? '<button data-cancelbk class="ghost">Mark cancelled</button>' : ''}
+      <button data-drop class="ghost">${item.editing ? 'Close' : 'Drop'}</button>
       <button data-save class="primary">Save</button>
     </div></div>`;
 }
@@ -342,17 +372,18 @@ function render(){
 
     const sel = node.querySelector('[data-trip]');
     const box = node.querySelector('[data-newtrip]');
-    sel.onchange = () => {
+    if (sel) sel.onchange = () => {
       box.style.display = sel.value === '__new__' ? 'block' : 'none';
       if (sel.value === '__new__') box.focus();
     };
     node.querySelector('[data-save]').onclick = async (e) => {
       e.target.disabled = true;
-      const trip = tripOf(node);
-      const r = await api('review-save', {
-        id, edits: collect(node), trip,
-        log: node.querySelector('[data-log]').checked,
-      });
+      const item = D.items.find(i => i.id === id) || {};
+      const trip = item.cancels ? '' : tripOf(node);
+      const r = await api('review-save', item.cancels
+        ? {id, edits: {cancelled: item.cancels.on}, trip: '', log: false}
+        : {id, edits: collect(node), trip,
+           log: node.querySelector('[data-log]').checked});
       if (r.ok){
         toast(r.corrections ? `Saved with ${r.corrections} correction(s)` : 'Saved');
         // A trip named here is a trip the next card can be put in, without
@@ -375,6 +406,19 @@ function render(){
         toast(r.error || 'Could not save');
         e.target.disabled = false;
       }
+    };
+    const cbk = node.querySelector('[data-cancelbk]');
+    if (cbk) cbk.onclick = async (e) => {
+      if (!confirm('Mark this booking cancelled? It comes off the trip and out of the totals.')) return;
+      e.target.disabled = true;
+      const r = await api('review-save', {id, trip: '', log: false,
+        edits: {cancelled: new Date().toISOString().slice(0, 10)}});
+      if (r.ok){
+        toast('Marked cancelled');
+        D.items = D.items.filter(i => i.id !== id);
+        D.counts.waiting = D.items.length;
+        render();
+      } else { toast(r.error || 'Could not save'); e.target.disabled = false; }
     };
     node.querySelector('[data-drop]').onclick = async (e) => {
       e.target.disabled = true;

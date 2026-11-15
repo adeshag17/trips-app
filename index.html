@@ -620,6 +620,8 @@ button.dday:hover,.dday.on{border-color:var(--accent);background:color-mix(in sr
 .pedit.rates{max-width:520px}
 .pedit.rates input{max-width:240px}
 .pdetails summary{cursor:pointer;font-weight:600;font-size:14px}
+
+.sheetfoot .danger{color:#d9534f;margin-right:auto}
 </style>
 </head><body>
 <div id="appbar" class="appbar"><span class="as">Starting…</span></div>
@@ -1593,7 +1595,7 @@ if (D) render();
 // page before the network is consulted at all.
 // ---------------------------------------------------------------------------
 
-const CFG = {"owner":"adeshag17","repo":"vietnam-flights","ref":"master","workflow":"sync-mail.yml","payload":"data/trips-payload.json","review":"data/review-payload.json","prices":"data/prices-payload.json","pool":"data/flights.json","bundles":"data/bundles.json","pricecheck":"check-flights.yml","shell":"29"};
+const CFG = {"owner":"adeshag17","repo":"vietnam-flights","ref":"master","workflow":"sync-mail.yml","payload":"data/trips-payload.json","review":"data/review-payload.json","prices":"data/prices-payload.json","pool":"data/flights.json","bundles":"data/bundles.json","pricecheck":"check-flights.yml","shell":"30"};
 
 const K = {token: 'ft.token', data: 'ft.payload', at: 'ft.payload.at',
            etag: 'ft.payload.etag'};
@@ -2001,7 +2003,9 @@ function openEditor(vendor, id) {
         next sync, which runs straight after. Anything left as it is stays as
         it is.</p>
         <div class="sheetfoot">
-          <button type="button" class="ghost" id="ed-cancel">Cancel</button>
+          <button type="button" class="ghost danger" id="ed-cancelled"
+            title="Cancelled with the airline or hotel: take it off the trip">Mark cancelled</button>
+          <button type="button" class="ghost" id="ed-cancel">Close</button>
           <button type="submit" class="go" id="ed-save">Save</button>
         </div>
       </form>
@@ -2010,6 +2014,28 @@ function openEditor(vendor, id) {
   const close = () => { host.hidden = true; host.innerHTML = ''; };
   document.getElementById('ed-close').onclick = close;
   document.getElementById('ed-cancel').onclick = close;
+  // No cancellation email, or one that quotes no reference we know: the
+  // booking is taken off its trip here instead. It stays on file.
+  document.getElementById('ed-cancelled').onclick = async e => {
+    if (!confirm('Mark this booking cancelled? It comes off the trip and out of the totals.')) return;
+    e.target.disabled = true;
+    try {
+      await appendEdit({
+        id: (crypto.randomUUID ? crypto.randomUUID()
+                               : String(Date.now()) + Math.random()),
+        at: new Date().toISOString(), from: 'app',
+        vendor: b.vendor, booking_id: b.booking_id,
+        fields: {cancelled: new Date().toISOString().slice(0, 10)}, segments: {},
+      });
+    } catch (err) {
+      e.target.disabled = false;
+      alert(writeError(err, 'cancel'));
+      return;
+    }
+    close();
+    status('Marked cancelled — applying…');
+    refresh();
+  };
   document.getElementById('ed-trip').onchange = e => {
     const fresh = e.target.value === '__new__';
     document.getElementById('ed-newtrip').hidden = !fresh;
