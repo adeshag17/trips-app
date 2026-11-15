@@ -622,6 +622,25 @@ button.dday:hover,.dday.on{border-color:var(--accent);background:color-mix(in sr
 .pdetails summary{cursor:pointer;font-weight:600;font-size:14px}
 
 .sheetfoot .danger{color:#d9534f;margin-right:auto}
+
+.ptrack{border:1px solid var(--line);border-radius:12px;padding:10px 14px;margin:0 0 18px}
+.ptrack summary{cursor:pointer}
+.ptrack summary .dim{font-size:12px;margin-left:6px}
+.popts.track{margin-top:10px}
+.popts.track td{vertical-align:top}
+.popts.track .tgroup td{font-size:11px;text-transform:uppercase;letter-spacing:.04em;
+  color:var(--dim);padding-top:12px}
+.popts.track tr.off td{opacity:.5}
+.popts.track .tsw{width:32px}
+.popts.track .tag{font-size:10.5px;margin-left:6px}
+.tadd{display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end;margin-top:12px}
+.tadd>b{width:100%;font-size:13px}
+.tadd label{display:flex;flex-direction:column;gap:2px;font-size:10.5px;color:var(--dim)}
+.tadd label.chk{flex-direction:row;align-items:center;gap:6px;font-size:12px;color:inherit}
+.tadd input:not([type=checkbox]){font:inherit;font-size:12px;padding:4px 6px;border-radius:6px;
+  border:1px solid var(--line);background:#0f1422;color:inherit;width:110px}
+.tadd input[name=from],.tadd input[name=to]{width:60px;text-transform:uppercase}
+.tadd input[name=people]{width:56px}
 </style>
 </head><body>
 <div id="appbar" class="appbar"><span class="as">Starting…</span></div>
@@ -1595,7 +1614,7 @@ if (D) render();
 // page before the network is consulted at all.
 // ---------------------------------------------------------------------------
 
-const CFG = {"owner":"adeshag17","repo":"vietnam-flights","ref":"master","workflow":"sync-mail.yml","payload":"data/trips-payload.json","review":"data/review-payload.json","prices":"data/prices-payload.json","pool":"data/flights.json","bundles":"data/bundles.json","pricecheck":"check-flights.yml","shell":"30"};
+const CFG = {"owner":"adeshag17","repo":"vietnam-flights","ref":"master","workflow":"sync-mail.yml","payload":"data/trips-payload.json","review":"data/review-payload.json","prices":"data/prices-payload.json","pool":"data/flights.json","bundles":"data/bundles.json","tracking":"data/tracking.json","pricecheck":"check-flights.yml","shell":"31"};
 
 const K = {token: 'ft.token', data: 'ft.payload', at: 'ft.payload.at',
            etag: 'ft.payload.etag'};
@@ -2419,11 +2438,183 @@ window.__reviewWrite = async (action, payload) => {
 
 let PRICES = null;
 
+let TRACK = null;          // data/tracking.json: what is switched off, what was added
+
 async function openPrices() {
   const host = document.getElementById('pricesview');
   if (!PRICES) host.innerHTML = '<div class="pempty">Loading prices…</div>';
-  PRICES = await fetchData(CFG.prices, 'ft.prices') || PRICES;
+  const [prices, track] = await Promise.all([
+    fetchData(CFG.prices, 'ft.prices'), fetchData(CFG.tracking, 'ft.tracking')]);
+  PRICES = prices || PRICES;
+  TRACK = Object.assign({off: [], extra: []}, track || TRACK || {});
+  paintPrices();
+}
+
+function paintPrices() {
+  const host = document.getElementById('pricesview');
   host.innerHTML = renderPrices(PRICES);
+  wireTracking(host);
+}
+
+// ---------- what is being tracked -------------------------------------------
+
+// The rows come from the last price check (what it would search); the
+// switches and added flights from tracking.json, which may be newer - a
+// change made here shows at once, and is searched from the next check.
+function trackRows() {
+  const off = new Set(TRACK.off || []);
+  const rows = ((PRICES && PRICES.tracking) || []).filter(r => r.kind !== 'extra')
+    .map(r => Object.assign({}, r, {on: !off.has(r.id)}));
+  const known = new Set(((PRICES && PRICES.tracking) || []).map(r => r.id));
+  (TRACK.extra || []).forEach(e => {
+    const id = 'extra:' + e.id;
+    const was = ((PRICES && PRICES.tracking) || []).find(r => r.id === id) || {};
+    const n = +e.people || 1;
+    rows.push(Object.assign({
+      id: id, kind: 'extra', group: 'Added by you', origin: e.from, destination: e.to,
+      dates: e.dates, who: [`${n} ${n === 1 ? 'person' : 'people'}`], direct: !!e.direct,
+      searches: e.dates.length * (e.direct ? 4 : 6), note: '',
+      // As the check decides it: more than 30 days out, once a day.
+      daily: e.dates[0] > new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 10),
+    }, was, {on: true, removable: true, fresh: !known.has(id)}));
+  });
+  return rows;
+}
+
+function dayRange(dates) {
+  if (!dates || !dates.length) return '';
+  const a = shortDate(dates[0]), b = shortDate(dates[dates.length - 1]);
+  return a === b ? a : `${a} – ${b} <span class="dim">(${dates.length} days)</span>`;
+}
+
+function renderTracking() {
+  if (!TRACK) return '';
+  const rows = trackRows();
+  const kinds = [['plan', 'Plan legs still to book'], ['extra', 'Added by you'],
+                 ['booked', 'Booked flights, until they fly'],
+                 ['bundles', 'Vietnam bundles']];
+  const onRows = rows.filter(r => r.on);
+  const perCheck = onRows.reduce((n, r) => n + (r.searches || 0), 0);
+  const body = kinds.map(([k, title]) => {
+    const mine = rows.filter(r => r.kind === k);
+    if (!mine.length) return '';
+    return `<tr class="tgroup"><td colspan="5">${title}</td></tr>` + mine.map(r => `
+      <tr class="${r.on ? '' : 'off'}">
+        <td class="tsw"><input type="checkbox" data-track="${esc(r.id)}" ${r.on ? 'checked' : ''}
+          ${r.removable ? 'disabled title="Added by you - remove it instead"' : ''}
+          aria-label="Track ${esc(r.origin)} to ${esc(r.destination)}"></td>
+        <td><b>${r.origin ? `${esc(r.origin)} → ${esc(r.destination)}` : esc(r.flight || '')}</b>
+          ${r.origin && r.flight ? `<div class="dim">${esc(r.flight)}</div>` : ''}
+          ${r.direct ? '<span class="tag">nonstop only</span>' : ''}
+          ${r.fresh ? '<span class="tag">new - searched from the next check</span>' : ''}</td>
+        <td>${dayRange(r.dates)}<div class="dim">${esc(r.group)}${
+          (r.who || []).length ? ' · ' + esc(r.who.join(', ')) : ''}</div></td>
+        <td class="dim">${r.note ? esc(r.note)
+          : r.kind === 'bundles' ? 'twice a day'
+          : r.daily ? 'once a day' : 'twice a day'}</td>
+        <td class="num">${r.searches == null ? '' : r.searches}
+          ${r.removable ? `<button class="linkbtn" data-untrack="${esc(r.id)}"
+            title="Stop tracking and remove">✕</button>` : ''}</td>
+      </tr>`).join('');
+  }).join('');
+  return `<details class="ptrack" open>
+    <summary><b>What is being tracked</b>
+      <span class="dim">${onRows.length} of ${rows.length} on · about ${perCheck}
+        searches a check, before once-a-day skips</span></summary>
+    <table class="popts track"><thead><tr><th>On</th><th>Flight</th><th>Days</th>
+      <th>How often</th><th class="num">Searches</th></tr></thead>
+      <tbody>${body}</tbody></table>
+    <form class="tadd" id="tadd">
+      <b>Track another flight</b>
+      <label>From<input name="from" maxlength="3" placeholder="SIN" required></label>
+      <label>To<input name="to" maxlength="3" placeholder="BOM" required></label>
+      <label>First day<input name="first" type="date" required></label>
+      <label>Last day<input name="last" type="date"></label>
+      <label>People<input name="people" type="number" min="1" max="9" value="1"></label>
+      <label class="chk"><input name="direct" type="checkbox"> Nonstop only</label>
+      <button class="refresh" type="submit">Add</button>
+    </form>
+    <p class="dim" id="tmsg">Changes are saved to your private repository and
+      used from the next price check (twice a day), or straight away with
+      <button class="linkbtn" id="trefresh" type="button">Refresh prices</button>.</p>
+  </details>`;
+}
+
+async function saveTracking(what) {
+  const msg = document.getElementById('tmsg');
+  if (msg) msg.textContent = 'Saving…';
+  const clean = {off: [...new Set(TRACK.off || [])].sort(), extra: TRACK.extra || []};
+  try {
+    await putFile(CFG.tracking, JSON.stringify(clean, null, 2) + '\n', what);
+    LS.set('ft.tracking', JSON.stringify(clean));
+    LS.set('ft.tracking.etag', '');
+  } catch (e) {
+    paintPrices();
+    const m = document.getElementById('tmsg');
+    if (m) m.textContent = writeError(e, 'save what is tracked');
+    return;
+  }
+  paintPrices();
+  const m = document.getElementById('tmsg');
+  if (m) m.innerHTML = `Saved. Searched from the next price check, or now:
+    <button class="linkbtn" id="trefresh" type="button">Refresh prices</button>.`;
+  wireRefresh();
+}
+
+function wireRefresh() {
+  const b = document.getElementById('trefresh');
+  if (!b) return;
+  b.onclick = async () => {
+    const m = document.getElementById('tmsg');
+    b.disabled = true;
+    try {
+      await api(`/repos/${CFG.owner}/${CFG.repo}/actions/workflows/${CFG.pricecheck}/dispatches`,
+        {method: 'POST', body: JSON.stringify({ref: CFG.ref, inputs: {plans_only: 'true'}})});
+      if (m) m.textContent = 'Searching in the cloud - new prices land here in a few minutes.';
+    } catch (e) {
+      b.disabled = false;
+      if (m) m.textContent = writeError(e, 'start the price check');
+    }
+  };
+}
+
+function wireTracking(host) {
+  host.querySelectorAll('[data-track]').forEach(box => box.onchange = () => {
+    const off = new Set(TRACK.off || []);
+    if (box.checked) off.delete(box.dataset.track); else off.add(box.dataset.track);
+    TRACK.off = [...off];
+    saveTracking((box.checked ? 'Track ' : 'Stop tracking ') + box.dataset.track);
+  });
+  host.querySelectorAll('[data-untrack]').forEach(b => b.onclick = () => {
+    const id = b.dataset.untrack.replace(/^extra:/, '');
+    TRACK.extra = (TRACK.extra || []).filter(e => e.id !== id);
+    saveTracking('Stop tracking an added flight');
+  });
+  const form = host.querySelector('#tadd');
+  if (form) form.onsubmit = ev => {
+    ev.preventDefault();
+    const v = n => form.querySelector(`[name="${n}"]`);
+    const from = v('from').value.trim().toUpperCase(), to = v('to').value.trim().toUpperCase();
+    const first = v('first').value, last = v('last').value || first;
+    const m = document.getElementById('tmsg');
+    if (!/^[A-Z]{3}$/.test(from) || !/^[A-Z]{3}$/.test(to)) {
+      if (m) m.textContent = 'From and To are three-letter airport codes, like SIN and BOM.';
+      return;
+    }
+    const dates = [];
+    for (let d = new Date(first + 'T00:00:00Z'); d <= new Date(last + 'T00:00:00Z');
+         d.setUTCDate(d.getUTCDate() + 1)) dates.push(d.toISOString().slice(0, 10));
+    if (!dates.length || dates.length > 14) {
+      if (m) m.textContent = 'Pick up to fourteen days, the last on or after the first.';
+      return;
+    }
+    TRACK.extra = (TRACK.extra || []).concat([{
+      id: Date.now().toString(36), from: from, to: to, dates: dates,
+      people: Math.max(1, +v('people').value || 1), direct: v('direct').checked,
+    }]);
+    saveTracking(`Track ${from}-${to}`);
+  };
+  wireRefresh();
 }
 
 const rupees = n => '₹' + Math.round(n).toLocaleString('en-IN');
@@ -2495,6 +2686,7 @@ function renderPrices(p) {
   }
   const body = sections.map(renderPlanPrices).join('');
   return `<div class="pwrap">
+    ${renderTracking()}
     <p class="dim">At today's lowest fares for each open leg, checked twice a
     day. Fares are what Google Flights advertised, not quotes.</p>
     ${body}${renderFlown(p.flown || [])}</div>`;
